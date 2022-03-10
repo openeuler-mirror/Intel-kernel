@@ -865,6 +865,9 @@ struct task_struct {
 	/* Stalled due to lack of memory */
 	unsigned			in_memstall:1;
 #endif
+#ifdef	CONFIG_CPU_SUP_INTEL
+	unsigned			reported_split_lock:1;
+#endif
 
 	unsigned long			atomic_flags; /* Flags requiring atomic access. */
 
