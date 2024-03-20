@@ -1112,7 +1112,7 @@ err_put_table:
 	return rc;
 }
 
-static void __exit einj_remove(struct platform_device *pdev)
+static void einj_remove(struct platform_device *pdev)
 {
 	struct apei_exec_context ctx;
 
