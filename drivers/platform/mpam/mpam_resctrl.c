@@ -68,19 +68,43 @@ bool resctrl_arch_mon_capable(void)
 	return exposed_mon_capable;
 }
 
+static bool min_capable[RDT_NUM_RESOURCES];
 bool resctrl_arch_feat_capable(enum resctrl_res_level level,
 			       enum resctrl_feat_type feat)
 {
-	if (feat == FEAT_PBM) {
+	switch (feat) {
+	case FEAT_PBM:
 		if (level == RDT_RESOURCE_L3)
 			return true;
+		break;
 
-	} else if (feat == FEAT_MAX) {
+	case FEAT_MAX:
 		if (level == RDT_RESOURCE_MBA)
 			return true;
+		break;
+
+	case FEAT_MIN:
+		return min_capable[level];
+
+	default:
+		break;
 	}
 
 	return false;
+}
+
+const char *resctrl_arch_set_feat_lab(enum resctrl_feat_type feat,
+				      unsigned long fflags)
+{
+	switch (feat) {
+	case FEAT_MIN:
+		return "MIN";
+
+	default:
+		break;
+	}
+
+	return "";
 }
 
 bool resctrl_arch_is_mbm_local_enabled(void)
@@ -779,6 +803,9 @@ static int mpam_resctrl_resource_init(struct mpam_resctrl_res *res)
 			exposed_alloc_capable = true;
 		}
 
+		if (mpam_has_feature(mpam_feat_cmin, &class->props))
+			min_capable[r->rid] = true;
+
 		/*
 		 * MBWU counters may be 'local' or 'total' depending on where
 		 * they are in the topology. Counters on caches are assumed to
@@ -819,6 +846,9 @@ static int mpam_resctrl_resource_init(struct mpam_resctrl_res *res)
 			r->alloc_capable = true;
 			exposed_alloc_capable = true;
 		}
+
+		if (mpam_has_feature(mpam_feat_mbw_min, cprops))
+			min_capable[r->rid] = true;
 
 		if (has_mbwu && class->type == MPAM_CLASS_MEMORY) {
 			mbm_total_class = class;
@@ -934,6 +964,10 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_domain *d,
 		   (feat == FEAT_PBM)) {
 			configured_by = mpam_feat_cpor_part;
 			break;
+		} else if (mpam_has_feature(mpam_feat_cmin, cprops) &&
+			  (feat == FEAT_MIN)) {
+			configured_by = mpam_feat_cmin;
+			break;
 		}
 		return -EINVAL;
 
@@ -946,6 +980,10 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_domain *d,
 			  (feat == FEAT_MAX)) {
 			configured_by = mpam_feat_mbw_max;
 			break;
+		} else if (mpam_has_feature(mpam_feat_mbw_min, cprops) &&
+			  (feat == FEAT_MIN)) {
+			configured_by = mpam_feat_mbw_min;
+			break;
 		}
 		fallthrough;
 	default:
@@ -953,18 +991,29 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_domain *d,
 	}
 
 	if (!r->alloc_capable || partid >= resctrl_arch_get_num_closid(r) ||
-	    !mpam_has_feature(configured_by, cfg))
+	    !mpam_has_feature(configured_by, cfg)) {
+		if (configured_by == mpam_feat_cmin)
+			return 0;
+
+		if (configured_by == mpam_feat_mbw_min)
+			return 0;
+
 		return r->default_ctrl;
+	}
 
 	switch (configured_by) {
 	case mpam_feat_cpor_part:
 		/* TODO: Scaling is not yet supported */
 		return cfg->cpbm;
+	case mpam_feat_cmin:
+		return mbw_max_to_percent(cfg->ca_min, cprops->cmax_wd);
 	case mpam_feat_mbw_part:
 		/* TODO: Scaling is not yet supported */
 		return mbw_pbm_to_percent(cfg->mbw_pbm, cprops);
 	case mpam_feat_mbw_max:
 		return mbw_max_to_percent(cfg->mbw_max, cprops->bwa_wd);
+	case mpam_feat_mbw_min:
+		return mbw_max_to_percent(cfg->mbw_min, cprops->bwa_wd);
 	default:
 		return -EINVAL;
 	}
@@ -994,6 +1043,8 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_domain *d, u32 cl
 	if (!r->alloc_capable || partid >= resctrl_arch_get_num_closid(r))
 		return -EINVAL;
 
+	cfg = dom->comp->cfg[partid];
+
 	switch (r->rid) {
 	case RDT_RESOURCE_L2:
 	case RDT_RESOURCE_L3:
@@ -1002,6 +1053,11 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_domain *d, u32 cl
 			/* TODO: Scaling is not yet supported */
 			cfg.cpbm = cfg_val;
 			mpam_set_feature(mpam_feat_cpor_part, &cfg);
+			break;
+		} else if (mpam_has_feature(mpam_feat_cmin, cprops) &&
+			  (f == FEAT_MIN)) {
+			cfg.ca_min = percent_to_mbw_max(cfg_val, cprops->cmax_wd);
+			mpam_set_feature(mpam_feat_cmin, &cfg);
 			break;
 		}
 		return -EINVAL;
@@ -1015,6 +1071,11 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_domain *d, u32 cl
 			  (f == FEAT_MAX)) {
 			cfg.mbw_max = percent_to_mbw_max(cfg_val, cprops->bwa_wd);
 			mpam_set_feature(mpam_feat_mbw_max, &cfg);
+			break;
+		} else if (mpam_has_feature(mpam_feat_mbw_min, cprops) &&
+			  (f == FEAT_MIN)) {
+			cfg.mbw_min = percent_to_mbw_max(cfg_val, cprops->bwa_wd);
+			mpam_set_feature(mpam_feat_mbw_min, &cfg);
 			break;
 		}
 		fallthrough;

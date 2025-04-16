@@ -66,6 +66,26 @@ static bool bw_validate(char *buf, unsigned long *data, struct rdt_resource *r)
 	return true;
 }
 
+static bool deci_validate(char *buf, unsigned long *data, struct rdt_resource *r)
+{
+	unsigned long deci;
+	int ret;
+
+	ret = kstrtoul(buf, 10, &deci);
+	if (ret) {
+		rdt_last_cmd_printf("Non-decimal digit in value %s\n", buf);
+		return false;
+	}
+
+	if (deci > 100) {
+		rdt_last_cmd_printf("Value %ld out of range [0,100]\n", deci);
+		return false;
+	}
+
+	*data = deci;
+	return true;
+}
+
 static int parse_bw(struct rdt_parse_data *data, struct resctrl_schema *s,
 		    struct rdt_domain *d)
 {
@@ -80,12 +100,19 @@ static int parse_bw(struct rdt_parse_data *data, struct resctrl_schema *s,
 		return -EINVAL;
 	}
 
-	if (!bw_validate(data->buf, &bw_val, r))
-		return -EINVAL;
+	if (r->rid == RDT_RESOURCE_MBA) {
+		if (!bw_validate(data->buf, &bw_val, r))
+			return -EINVAL;
 
-	if (is_mba_sc(r)) {
-		d->mbps_val[closid] = bw_val;
-		return 0;
+		if (s->feat_type == FEAT_MAX && is_mba_sc(r)) {
+			d->mbps_val[closid] = bw_val;
+			return 0;
+		}
+
+	} else {
+		/* For the RDT_RESOURCE_L3/L2 */
+		if (!deci_validate(data->buf, &bw_val, r))
+			return -EINVAL;
 	}
 
 	cfg->new_ctrl = bw_val;

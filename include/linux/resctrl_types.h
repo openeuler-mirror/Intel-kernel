@@ -76,6 +76,7 @@ enum resctrl_conf_type {
 enum resctrl_feat_type {
 	FEAT_PBM,
 	FEAT_MAX,
+	FEAT_MIN,
 	FEAT_NUM_TYPES,
 };
 

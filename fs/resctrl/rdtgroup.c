@@ -2449,8 +2449,9 @@ static int schemata_list_add(struct rdt_resource *r,
 	s->conf_type = type;
 	s->feat_type = feat;
 
-	ret = snprintf(s->name, sizeof(s->name), "%s%s",
-		       r->name, suffix);
+	ret = snprintf(s->name, sizeof(s->name), "%s%s%s",
+		       r->name, suffix,
+		       resctrl_arch_set_feat_lab(feat, r->fflags));
 	if (ret >= sizeof(s->name)) {
 		kfree(s);
 		return -EINVAL;

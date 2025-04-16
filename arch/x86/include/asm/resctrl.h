@@ -240,6 +240,12 @@ static inline bool resctrl_arch_feat_capable(enum resctrl_res_level level,
 	return false;
 }
 
+static inline const char *resctrl_arch_set_feat_lab(enum resctrl_feat_type feat,
+						    unsigned long fflags)
+{
+	return "";
+}
+
 #else
 
 static inline void resctrl_sched_in(struct task_struct *tsk) {}
