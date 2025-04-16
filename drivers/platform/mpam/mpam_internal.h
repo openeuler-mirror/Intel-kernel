@@ -161,6 +161,7 @@ struct mpam_config {
 	mpam_features_t		features;
 
 	u32	cpbm;
+	u16	ca_max;
 	u16	ca_min;
 
 	u32	mbw_pbm;

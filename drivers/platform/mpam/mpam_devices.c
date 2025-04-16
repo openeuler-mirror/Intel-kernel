@@ -1214,6 +1214,14 @@ static void mpam_reprogram_ris_partid(struct mpam_msc_ris *ris, u16 partid,
 					      rprops->cpbm_wd);
 	}
 
+	if (mpam_has_feature(mpam_feat_ccap_part, rprops)) {
+		if (mpam_has_feature(mpam_feat_ccap_part, cfg))
+			mpam_write_partsel_reg(msc, CMAX, cfg->ca_max);
+		else
+			mpam_write_partsel_reg(msc, CMAX, cmax);
+
+	}
+
 	if (mpam_has_feature(mpam_feat_cmin, rprops)) {
 		if (mpam_has_feature(mpam_feat_cmin, cfg))
 			mpam_write_partsel_reg(msc, CMIN, cfg->ca_min);
@@ -1245,9 +1253,6 @@ static void mpam_reprogram_ris_partid(struct mpam_msc_ris *ris, u16 partid,
 
 	if (mpam_has_feature(mpam_feat_mbw_prop, rprops))
 		mpam_write_partsel_reg(msc, MBW_PROP, bwa_fract);
-
-	if (mpam_has_feature(mpam_feat_ccap_part, rprops))
-		mpam_write_partsel_reg(msc, CMAX, cmax);
 
 	if (mpam_has_feature(mpam_feat_intpri_part_0_low, rprops))
 		intpri = GENMASK(rprops->intpri_wd - 1, 0);

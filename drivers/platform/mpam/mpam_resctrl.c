@@ -68,6 +68,7 @@ bool resctrl_arch_mon_capable(void)
 	return exposed_mon_capable;
 }
 
+static bool max_capable[RDT_NUM_RESOURCES];
 static bool min_capable[RDT_NUM_RESOURCES];
 static bool intpri_capable[RDT_NUM_RESOURCES];
 bool resctrl_arch_feat_capable(enum resctrl_res_level level,
@@ -80,9 +81,7 @@ bool resctrl_arch_feat_capable(enum resctrl_res_level level,
 		break;
 
 	case FEAT_MAX:
-		if (level == RDT_RESOURCE_MBA)
-			return true;
-		break;
+		return max_capable[level];
 
 	case FEAT_MIN:
 		return min_capable[level];
@@ -101,6 +100,11 @@ const char *resctrl_arch_set_feat_lab(enum resctrl_feat_type feat,
 				      unsigned long fflags)
 {
 	switch (feat) {
+	case FEAT_MAX:
+		if (fflags & RFTYPE_RES_MB)
+			break;
+		return "MAX";
+
 	case FEAT_MIN:
 		return "MIN";
 
@@ -811,6 +815,9 @@ static int mpam_resctrl_resource_init(struct mpam_resctrl_res *res)
 			exposed_alloc_capable = true;
 		}
 
+		if (mpam_has_feature(mpam_feat_ccap_part, &class->props))
+			max_capable[r->rid] = true;
+
 		if (mpam_has_feature(mpam_feat_cmin, &class->props))
 			min_capable[r->rid] = true;
 
@@ -857,6 +864,9 @@ static int mpam_resctrl_resource_init(struct mpam_resctrl_res *res)
 		if (class_has_usable_mba(cprops)) {
 			r->alloc_capable = true;
 			exposed_alloc_capable = true;
+
+			if (mpam_has_feature(mpam_feat_mbw_max, cprops))
+				max_capable[r->rid] = true;
 		}
 
 		if (mpam_has_feature(mpam_feat_mbw_min, cprops))
@@ -979,6 +989,12 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_domain *d,
 		   (feat == FEAT_PBM)) {
 			configured_by = mpam_feat_cpor_part;
 			break;
+
+		} else if (mpam_has_feature(mpam_feat_ccap_part, cprops) &&
+			  (feat == FEAT_MAX)) {
+			configured_by = mpam_feat_ccap_part;
+			break;
+
 		} else if (mpam_has_feature(mpam_feat_cmin, cprops) &&
 			  (feat == FEAT_MIN)) {
 			configured_by = mpam_feat_cmin;
@@ -1015,6 +1031,11 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_domain *d,
 
 	if (!r->alloc_capable || partid >= resctrl_arch_get_num_closid(r) ||
 	    !mpam_has_feature(configured_by, cfg)) {
+
+		if ((configured_by == mpam_feat_ccap_part) ||
+		    (configured_by == mpam_feat_mbw_max))
+			return MAX_MBA_BW;
+
 		if ((configured_by == mpam_feat_cmin) ||
 		    (configured_by == mpam_feat_mbw_min))
 			return 0;
@@ -1033,6 +1054,8 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_domain *d,
 	case mpam_feat_cpor_part:
 		/* TODO: Scaling is not yet supported */
 		return cfg->cpbm;
+	case mpam_feat_ccap_part:
+		return mbw_max_to_percent(cfg->ca_max, cprops->cmax_wd);
 	case mpam_feat_cmin:
 		return mbw_max_to_percent(cfg->ca_min, cprops->cmax_wd);
 	case mpam_feat_mbw_part:
@@ -1083,6 +1106,11 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_domain *d, u32 cl
 			/* TODO: Scaling is not yet supported */
 			cfg.cpbm = cfg_val;
 			mpam_set_feature(mpam_feat_cpor_part, &cfg);
+			break;
+		} else if (mpam_has_feature(mpam_feat_ccap_part, cprops) &&
+			  (f == FEAT_MAX)) {
+			cfg.ca_max = percent_to_mbw_max(cfg_val, cprops->cmax_wd);
+			mpam_set_feature(mpam_feat_ccap_part, &cfg);
 			break;
 		} else if (mpam_has_feature(mpam_feat_cmin, cprops) &&
 			  (f == FEAT_MIN)) {
