@@ -166,6 +166,12 @@ struct mpam_config {
 	u32	mbw_pbm;
 	u16	mbw_max;
 	u16	mbw_min;
+
+	/*
+	 *  dspri is downstream priority, intpri is internal priority.
+	 */
+	u16	dspri;
+	u16	intpri;
 };
 
 struct mpam_component

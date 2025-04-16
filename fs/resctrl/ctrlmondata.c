@@ -86,6 +86,32 @@ static bool deci_validate(char *buf, unsigned long *data, struct rdt_resource *r
 	return true;
 }
 
+static bool prio_validate(char *buf, unsigned long *data, struct rdt_resource *r)
+{
+	unsigned long prio, prio_max;
+	int ret;
+
+	ret = kstrtoul(buf, 10, &prio);
+	if (ret) {
+		rdt_last_cmd_printf("Non-decimal digit in PRIO value %s\n", buf);
+		return false;
+	}
+
+	if (r->fflags & RFTYPE_RES_CACHE)
+		prio_max = GENMASK(r->cache.intpri_wd - 1, 0);
+	else
+		prio_max = GENMASK(r->membw.intpri_wd - 1, 0);
+
+	if (prio > prio_max) {
+		rdt_last_cmd_printf("PRIO value %ld out of range [0,%ld]\n",
+				     prio, prio_max);
+		return false;
+	}
+
+	*data = prio;
+	return true;
+}
+
 static int parse_bw(struct rdt_parse_data *data, struct resctrl_schema *s,
 		    struct rdt_domain *d)
 {
@@ -100,7 +126,12 @@ static int parse_bw(struct rdt_parse_data *data, struct resctrl_schema *s,
 		return -EINVAL;
 	}
 
-	if (r->rid == RDT_RESOURCE_MBA) {
+	if (s->feat_type == FEAT_INTPRI) {
+		if (!prio_validate(data->buf, &bw_val, r))
+			return -EINVAL;
+
+	} else if (r->rid == RDT_RESOURCE_MBA) {
+		/* For FEAT_MAX and FEAT_MIN */
 		if (!bw_validate(data->buf, &bw_val, r))
 			return -EINVAL;
 

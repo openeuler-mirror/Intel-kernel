@@ -140,6 +140,7 @@ struct resctrl_cache {
 	unsigned int	shareable_bits;
 	bool		arch_has_sparse_bitmasks;
 	bool		arch_has_per_cpu_cfg;
+	unsigned int	intpri_wd;
 };
 
 /**
@@ -175,6 +176,7 @@ struct resctrl_membw {
 	enum membw_throttle_mode	throttle_mode;
 	bool				mba_sc;
 	u32				*mb_map;
+	u32				intpri_wd;
 };
 
 /**

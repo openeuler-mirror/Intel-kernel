@@ -69,6 +69,7 @@ bool resctrl_arch_mon_capable(void)
 }
 
 static bool min_capable[RDT_NUM_RESOURCES];
+static bool intpri_capable[RDT_NUM_RESOURCES];
 bool resctrl_arch_feat_capable(enum resctrl_res_level level,
 			       enum resctrl_feat_type feat)
 {
@@ -86,6 +87,9 @@ bool resctrl_arch_feat_capable(enum resctrl_res_level level,
 	case FEAT_MIN:
 		return min_capable[level];
 
+	case FEAT_INTPRI:
+		return intpri_capable[level];
+
 	default:
 		break;
 	}
@@ -99,6 +103,9 @@ const char *resctrl_arch_set_feat_lab(enum resctrl_feat_type feat,
 	switch (feat) {
 	case FEAT_MIN:
 		return "MIN";
+
+	case FEAT_INTPRI:
+		return "PRI";
 
 	default:
 		break;
@@ -780,6 +787,7 @@ static int mpam_resctrl_resource_init(struct mpam_resctrl_res *res)
 		/* TODO: Scaling is not yet supported */
 		r->cache.cbm_len = class->props.cpbm_wd;
 		r->cache.arch_has_sparse_bitmasks = true;
+		r->cache.intpri_wd = class->props.intpri_wd;
 
 		/* mpam_devices will reject empty bitmaps */
 		r->cache.min_cbm_bits = 1;
@@ -805,6 +813,9 @@ static int mpam_resctrl_resource_init(struct mpam_resctrl_res *res)
 
 		if (mpam_has_feature(mpam_feat_cmin, &class->props))
 			min_capable[r->rid] = true;
+
+		if (mpam_has_feature(mpam_feat_intpri_part, &class->props))
+			intpri_capable[r->rid] = true;
 
 		/*
 		 * MBWU counters may be 'local' or 'total' depending on where
@@ -837,6 +848,7 @@ static int mpam_resctrl_resource_init(struct mpam_resctrl_res *res)
 		r->membw.delay_linear = true;
 		r->membw.throttle_mode = THREAD_THROTTLE_UNDEFINED;
 		r->membw.bw_gran = get_mba_granularity(cprops);
+		r->membw.intpri_wd = class->props.intpri_wd;
 
 		/* Round up to at least 1% */
 		if (!r->membw.bw_gran)
@@ -849,6 +861,9 @@ static int mpam_resctrl_resource_init(struct mpam_resctrl_res *res)
 
 		if (mpam_has_feature(mpam_feat_mbw_min, cprops))
 			min_capable[r->rid] = true;
+
+		if (mpam_has_feature(mpam_feat_intpri_part, cprops))
+			intpri_capable[r->rid] = true;
 
 		if (has_mbwu && class->type == MPAM_CLASS_MEMORY) {
 			mbm_total_class = class;
@@ -968,6 +983,10 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_domain *d,
 			  (feat == FEAT_MIN)) {
 			configured_by = mpam_feat_cmin;
 			break;
+		} else if (mpam_has_feature(mpam_feat_intpri_part, cprops) &&
+			  (feat == FEAT_INTPRI)) {
+			configured_by = mpam_feat_intpri_part;
+			break;
 		}
 		return -EINVAL;
 
@@ -984,6 +1003,10 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_domain *d,
 			  (feat == FEAT_MIN)) {
 			configured_by = mpam_feat_mbw_min;
 			break;
+		} else if (mpam_has_feature(mpam_feat_intpri_part, cprops) &&
+			  (feat == FEAT_INTPRI)) {
+			configured_by = mpam_feat_intpri_part;
+			break;
 		}
 		fallthrough;
 	default:
@@ -992,11 +1015,16 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_domain *d,
 
 	if (!r->alloc_capable || partid >= resctrl_arch_get_num_closid(r) ||
 	    !mpam_has_feature(configured_by, cfg)) {
-		if (configured_by == mpam_feat_cmin)
+		if ((configured_by == mpam_feat_cmin) ||
+		    (configured_by == mpam_feat_mbw_min))
 			return 0;
 
-		if (configured_by == mpam_feat_mbw_min)
-			return 0;
+		if (configured_by == mpam_feat_intpri_part) {
+			if (!mpam_has_feature(mpam_feat_intpri_part_0_low, cprops))
+				return 0;
+
+			return (u32)GENMASK(cprops->intpri_wd - 1, 0);
+		}
 
 		return r->default_ctrl;
 	}
@@ -1014,6 +1042,8 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_domain *d,
 		return mbw_max_to_percent(cfg->mbw_max, cprops->bwa_wd);
 	case mpam_feat_mbw_min:
 		return mbw_max_to_percent(cfg->mbw_min, cprops->bwa_wd);
+	case mpam_feat_intpri_part:
+		return cfg->intpri;
 	default:
 		return -EINVAL;
 	}
@@ -1059,6 +1089,11 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_domain *d, u32 cl
 			cfg.ca_min = percent_to_mbw_max(cfg_val, cprops->cmax_wd);
 			mpam_set_feature(mpam_feat_cmin, &cfg);
 			break;
+		} else if (mpam_has_feature(mpam_feat_intpri_part, cprops) &&
+			  (f == FEAT_INTPRI)) {
+			cfg.intpri = cfg_val;
+			mpam_set_feature(mpam_feat_intpri_part, &cfg);
+			break;
 		}
 		return -EINVAL;
 
@@ -1077,7 +1112,13 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_domain *d, u32 cl
 			cfg.mbw_min = percent_to_mbw_max(cfg_val, cprops->bwa_wd);
 			mpam_set_feature(mpam_feat_mbw_min, &cfg);
 			break;
+		} else if (mpam_has_feature(mpam_feat_intpri_part, cprops) &&
+			  (f == FEAT_INTPRI)) {
+			cfg.intpri = cfg_val;
+			mpam_set_feature(mpam_feat_intpri_part, &cfg);
+			break;
 		}
+
 		fallthrough;
 	default:
 		return -EINVAL;
