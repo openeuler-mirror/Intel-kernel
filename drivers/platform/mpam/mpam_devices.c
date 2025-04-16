@@ -921,6 +921,14 @@ static const struct midr_range mbwu_flowrate_list[] = {
 	{ /* sentinel */ }
 };
 
+bool resctrl_arch_would_mbm_overflow(void)
+{
+	if (is_midr_in_range_list(read_cpuid_id(), mbwu_flowrate_list))
+		return false;
+
+	return true;
+}
+
 static void __ris_msmon_read(void *arg)
 {
 	bool nrdy = false;
@@ -1009,7 +1017,7 @@ static void __ris_msmon_read(void *arg)
 		 * was last reset in the latest version (DDI0598D_b).
 		 */
 		if (ris->comp->class->type == MPAM_CLASS_MEMORY) {
-			if (is_midr_in_range_list(read_cpuid_id(), mbwu_flowrate_list))
+			if (!resctrl_arch_would_mbm_overflow())
 				break;
 		}
 
