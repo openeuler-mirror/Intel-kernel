@@ -1044,7 +1044,8 @@ static int rdt_bit_usage_show(struct kernfs_open_file *of,
 			if (!closid_allocated(i))
 				continue;
 			ctrl_val = resctrl_arch_get_config(r, dom, i,
-							   s->conf_type);
+							   s->conf_type,
+							   s->feat_type);
 			mode = rdtgroup_mode_by_closid(i);
 			switch (mode) {
 			case RDT_MODE_SHAREABLE:
@@ -1273,7 +1274,7 @@ static bool __rdtgroup_cbm_overlaps(struct rdt_resource *r, struct rdt_domain *d
 
 	/* Check for overlap with other resource groups */
 	for (i = 0; i < closids_supported(); i++) {
-		ctrl_b = resctrl_arch_get_config(r, d, i, type);
+		ctrl_b = resctrl_arch_get_config(r, d, i, type, FEAT_PBM);
 		mode = rdtgroup_mode_by_closid(i);
 		if (closid_allocated(i) && i != closid &&
 		    mode != RDT_MODE_PSEUDO_LOCKSETUP) {
@@ -1323,7 +1324,9 @@ bool rdtgroup_cbm_overlaps(struct resctrl_schema *s, struct rdt_domain *d,
 
 	if (!resctrl_arch_get_cdp_enabled(r->rid))
 		return false;
-	return  __rdtgroup_cbm_overlaps(r, d, cbm, closid, peer_type, exclusive);
+
+	return  __rdtgroup_cbm_overlaps(r, d, cbm, closid, peer_type,
+					exclusive);
 }
 
 /**
@@ -1358,7 +1361,8 @@ static bool rdtgroup_mode_test_exclusive(struct rdtgroup *rdtgrp)
 		has_cache = true;
 		list_for_each_entry(d, &r->domains, list) {
 			ctrl = resctrl_arch_get_config(r, d, closid,
-						       s->conf_type);
+						       s->conf_type,
+						       s->feat_type);
 			if (rdtgroup_cbm_overlaps(s, d, ctrl, closid, false)) {
 				rdt_last_cmd_puts("Schemata overlaps\n");
 				return false;
@@ -1491,6 +1495,7 @@ static int rdtgroup_size_show(struct kernfs_open_file *of,
 {
 	struct resctrl_schema *schema;
 	enum resctrl_conf_type type;
+	enum resctrl_feat_type feat;
 	struct rdtgroup *rdtgrp;
 	struct rdt_resource *r;
 	struct rdt_domain *d;
@@ -1527,6 +1532,7 @@ static int rdtgroup_size_show(struct kernfs_open_file *of,
 	list_for_each_entry(schema, &resctrl_schema_all, list) {
 		r = schema->res;
 		type = schema->conf_type;
+		feat = schema->feat_type;
 		sep = false;
 		seq_printf(s, "%*s:", max_name_width, schema->name);
 		list_for_each_entry(d, &r->domains, list) {
@@ -1540,12 +1546,13 @@ static int rdtgroup_size_show(struct kernfs_open_file *of,
 				else
 					ctrl = resctrl_arch_get_config(r, d,
 								       closid,
-								       type);
-				if (r->rid == RDT_RESOURCE_MBA ||
-				    r->rid == RDT_RESOURCE_SMBA)
-					size = ctrl;
-				else
+								       type,
+								       feat);
+				if ((r->fflags & RFTYPE_RES_CACHE) &&
+				     feat == FEAT_PBM)
 					size = rdtgroup_cbm_to_size(r, d, ctrl);
+				else
+					size = ctrl;
 			}
 			seq_printf(s, "%d=%u", d->id, size);
 			sep = true;
@@ -2405,11 +2412,30 @@ out_done:
 	return ret;
 }
 
-static int schemata_list_add(struct rdt_resource *r, enum resctrl_conf_type type)
+static int schemata_list_add(struct rdt_resource *r,
+			     enum resctrl_conf_type type,
+			     enum resctrl_feat_type feat)
 {
 	struct resctrl_schema *s;
-	const char *suffix = "";
+	const char *suffix;
 	int ret, cl;
+
+	if (!resctrl_arch_feat_capable(r->rid, feat))
+		return 0;
+
+	switch (type) {
+	case CDP_CODE:
+		suffix = "CODE";
+		break;
+	case CDP_DATA:
+		suffix = "DATA";
+		break;
+	case CDP_NONE:
+		suffix = "";
+		break;
+	default:
+		return -EINVAL;
+	}
 
 	s = kzalloc(sizeof(*s), GFP_KERNEL);
 	if (!s)
@@ -2421,19 +2447,10 @@ static int schemata_list_add(struct rdt_resource *r, enum resctrl_conf_type type
 		s->num_closid /= 2;
 
 	s->conf_type = type;
-	switch (type) {
-	case CDP_CODE:
-		suffix = "CODE";
-		break;
-	case CDP_DATA:
-		suffix = "DATA";
-		break;
-	case CDP_NONE:
-		suffix = "";
-		break;
-	}
+	s->feat_type = feat;
 
-	ret = snprintf(s->name, sizeof(s->name), "%s%s", r->name, suffix);
+	ret = snprintf(s->name, sizeof(s->name), "%s%s",
+		       r->name, suffix);
 	if (ret >= sizeof(s->name)) {
 		kfree(s);
 		return -EINVAL;
@@ -2466,29 +2483,33 @@ static int schemata_list_add(struct rdt_resource *r, enum resctrl_conf_type type
 
 static int schemata_list_create(void)
 {
+	enum resctrl_feat_type feat;
 	enum resctrl_res_level i;
 	struct rdt_resource *r;
 	int ret = 0;
 
 	for (i = 0; i < RDT_NUM_RESOURCES; i++) {
 		r = resctrl_arch_get_resource(i);
-		if (!r->alloc_capable)
+		if (!r || !r->alloc_capable)
 			continue;
 
-		if (resctrl_arch_get_cdp_enabled(r->rid)) {
-			ret = schemata_list_add(r, CDP_CODE);
-			if (ret)
-				break;
+		for (feat = 0; feat < FEAT_NUM_TYPES; feat++) {
+			if (resctrl_arch_get_cdp_enabled(r->rid)) {
+				ret = schemata_list_add(r, CDP_CODE, feat);
+				if (ret)
+					goto out;
 
-			ret = schemata_list_add(r, CDP_DATA);
-		} else {
-			ret = schemata_list_add(r, CDP_NONE);
+				ret = schemata_list_add(r, CDP_DATA, feat);
+				if (ret)
+					goto out;
+			} else {
+				ret = schemata_list_add(r, CDP_NONE, feat);
+				if (ret)
+					goto out;
+			}
 		}
-
-		if (ret)
-			break;
 	}
-
+out:
 	return ret;
 }
 
@@ -3057,6 +3078,7 @@ static int __init_one_rdt_domain(struct rdt_domain *d, struct resctrl_schema *s,
 {
 	enum resctrl_conf_type peer_type = resctrl_peer_type(s->conf_type);
 	enum resctrl_conf_type t = s->conf_type;
+	enum resctrl_feat_type feat = s->feat_type;
 	struct resctrl_staged_config *cfg;
 	struct rdt_resource *r = s->res;
 	u32 used_b = 0, unused_b = 0;
@@ -3065,7 +3087,7 @@ static int __init_one_rdt_domain(struct rdt_domain *d, struct resctrl_schema *s,
 	u32 peer_ctl, ctrl_val;
 	int i;
 
-	cfg = &d->staged_config[t];
+	cfg = &d->staged_config[t][feat];
 	cfg->have_new_ctrl = false;
 	cfg->new_ctrl = r->cache.shareable_bits;
 	used_b = r->cache.shareable_bits;
@@ -3086,11 +3108,13 @@ static int __init_one_rdt_domain(struct rdt_domain *d, struct resctrl_schema *s,
 			 */
 			if (resctrl_arch_get_cdp_enabled(r->rid))
 				peer_ctl = resctrl_arch_get_config(r, d, i,
-								   peer_type);
+								   peer_type,
+								   feat);
 			else
 				peer_ctl = 0;
 			ctrl_val = resctrl_arch_get_config(r, d, i,
-							   s->conf_type);
+							   s->conf_type,
+							   feat);
 			used_b |= ctrl_val | peer_ctl;
 			if (mode == RDT_MODE_SHAREABLE)
 				cfg->new_ctrl |= ctrl_val | peer_ctl;
@@ -3156,7 +3180,7 @@ static void rdtgroup_init_mba(struct rdt_resource *r, u32 closid)
 			continue;
 		}
 
-		cfg = &d->staged_config[CDP_NONE];
+		cfg = &d->staged_config[CDP_NONE][FEAT_MAX];
 		cfg->new_ctrl = r->default_ctrl;
 		cfg->have_new_ctrl = true;
 	}
@@ -3179,9 +3203,11 @@ static int rdtgroup_init_alloc(struct rdtgroup *rdtgrp)
 			if (is_mba_sc(r))
 				continue;
 		} else {
-			ret = rdtgroup_init_cat(s, rdtgrp->closid);
-			if (ret < 0)
-				goto out;
+			if (s->feat_type == FEAT_PBM) {
+				ret = rdtgroup_init_cat(s, rdtgrp->closid);
+				if (ret < 0)
+					goto out;
+			}
 		}
 
 		ret = resctrl_arch_update_domains(r, rdtgrp->closid);

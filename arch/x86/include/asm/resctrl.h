@@ -223,6 +223,23 @@ void resctrl_cpu_detect(struct cpuinfo_x86 *c);
 bool resctrl_arch_get_cdp_enabled(enum resctrl_res_level l);
 int resctrl_arch_set_cdp_enabled(enum resctrl_res_level l, bool enable);
 
+static inline bool resctrl_arch_feat_capable(enum resctrl_res_level level,
+					     enum resctrl_feat_type feat)
+{
+	if (feat == FEAT_PBM) {
+		if (level == RDT_RESOURCE_L3 ||
+		    level == RDT_RESOURCE_L2)
+			return true;
+
+	} else if (feat == FEAT_MAX) {
+		if (level == RDT_RESOURCE_MBA ||
+		    level == RDT_RESOURCE_SMBA)
+			return true;
+	}
+
+	return false;
+}
+
 #else
 
 static inline void resctrl_sched_in(struct task_struct *tsk) {}

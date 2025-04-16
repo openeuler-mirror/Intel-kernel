@@ -40,7 +40,8 @@ static bool apply_config(struct rdt_hw_domain *hw_dom,
 }
 
 int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_domain *d,
-			    u32 closid, enum resctrl_conf_type t, u32 cfg_val)
+			    u32 closid, enum resctrl_conf_type t,
+			    enum resctrl_feat_type f, u32 cfg_val)
 {
 	struct rdt_hw_resource *hw_res = resctrl_to_arch_res(r);
 	struct rdt_hw_domain *hw_dom = resctrl_to_arch_dom(d);
@@ -66,6 +67,7 @@ int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid)
 	struct rdt_hw_domain *hw_dom;
 	struct msr_param msr_param;
 	enum resctrl_conf_type t;
+	enum resctrl_feat_type f;
 	cpumask_var_t cpu_mask;
 	struct rdt_domain *d;
 	u32 idx;
@@ -80,21 +82,23 @@ int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid)
 	list_for_each_entry(d, &r->domains, list) {
 		hw_dom = resctrl_to_arch_dom(d);
 		for (t = 0; t < CDP_NUM_TYPES; t++) {
-			cfg = &hw_dom->d_resctrl.staged_config[t];
-			if (!cfg->have_new_ctrl)
-				continue;
+			for (f = 0; f < FEAT_NUM_TYPES; f++) {
+				cfg = &hw_dom->d_resctrl.staged_config[t][f];
+				if (!cfg->have_new_ctrl)
+					continue;
 
-			idx = resctrl_get_config_index(closid, t);
-			if (!apply_config(hw_dom, cfg, idx, cpu_mask))
-				continue;
+				idx = resctrl_get_config_index(closid, t);
+				if (!apply_config(hw_dom, cfg, idx, cpu_mask))
+					continue;
 
-			if (!msr_param.res) {
-				msr_param.low = idx;
-				msr_param.high = msr_param.low + 1;
-				msr_param.res = r;
-			} else {
-				msr_param.low = min(msr_param.low, idx);
-				msr_param.high = max(msr_param.high, idx + 1);
+				if (!msr_param.res) {
+					msr_param.low = idx;
+					msr_param.high = msr_param.low + 1;
+					msr_param.res = r;
+				} else {
+					msr_param.low = min(msr_param.low, idx);
+					msr_param.high = max(msr_param.high, idx + 1);
+				}
 			}
 		}
 	}
@@ -112,7 +116,8 @@ done:
 }
 
 u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_domain *d,
-			    u32 closid, enum resctrl_conf_type type)
+			    u32 closid, enum resctrl_conf_type type,
+			    enum resctrl_feat_type feat)
 {
 	struct rdt_hw_domain *hw_dom = resctrl_to_arch_dom(d);
 	u32 idx = resctrl_get_config_index(closid, type);

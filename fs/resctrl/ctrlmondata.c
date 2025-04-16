@@ -74,7 +74,7 @@ static int parse_bw(struct rdt_parse_data *data, struct resctrl_schema *s,
 	struct rdt_resource *r = s->res;
 	unsigned long bw_val;
 
-	cfg = &d->staged_config[s->conf_type];
+	cfg = &d->staged_config[s->conf_type][s->feat_type];
 	if (cfg->have_new_ctrl) {
 		rdt_last_cmd_printf("Duplicate domain %d\n", d->id);
 		return -EINVAL;
@@ -153,7 +153,7 @@ static int parse_cbm(struct rdt_parse_data *data, struct resctrl_schema *s,
 	struct rdt_resource *r = s->res;
 	u32 cbm_val;
 
-	cfg = &d->staged_config[s->conf_type];
+	cfg = &d->staged_config[s->conf_type][s->feat_type];
 	if (cfg->have_new_ctrl) {
 		rdt_last_cmd_printf("Duplicate domain %d\n", d->id);
 		return -EINVAL;
@@ -203,9 +203,10 @@ static int parse_cbm(struct rdt_parse_data *data, struct resctrl_schema *s,
 	return 0;
 }
 
-static ctrlval_parser_t *get_parser(struct rdt_resource *res)
+static ctrlval_parser_t *get_parser(struct resctrl_schema *s)
 {
-	if (res->fflags & RFTYPE_RES_CACHE)
+	if ((s->res->fflags & RFTYPE_RES_CACHE) &&
+	    (s->feat_type == FEAT_PBM))
 		return &parse_cbm;
 	else
 		return &parse_bw;
@@ -220,8 +221,9 @@ static ctrlval_parser_t *get_parser(struct rdt_resource *res)
 static int parse_line(char *line, struct resctrl_schema *s,
 		      struct rdtgroup *rdtgrp)
 {
-	ctrlval_parser_t *parse_ctrlval = get_parser(s->res);
+	ctrlval_parser_t *parse_ctrlval = get_parser(s);
 	enum resctrl_conf_type t = s->conf_type;
+	enum resctrl_feat_type f = s->feat_type;
 	struct resctrl_staged_config *cfg;
 	struct rdt_resource *r = s->res;
 	struct rdt_parse_data data;
@@ -255,7 +257,7 @@ next:
 			if (parse_ctrlval(&data, s, d))
 				return -EINVAL;
 			if (rdtgrp->mode ==  RDT_MODE_PSEUDO_LOCKSETUP) {
-				cfg = &d->staged_config[t];
+				cfg = &d->staged_config[t][f];
 				/*
 				 * In pseudo-locking setup mode and just
 				 * parsed a valid CBM that should be
@@ -373,9 +375,13 @@ out:
 static void show_doms(struct seq_file *s, struct resctrl_schema *schema, int closid)
 {
 	struct rdt_resource *r = schema->res;
+	const char *format_str;
 	struct rdt_domain *dom;
 	bool sep = false;
 	u32 ctrl_val;
+
+	format_str = (schema->feat_type == FEAT_PBM) ?
+			"%d=%0*x" : "%d=%0*u";
 
 	/* Walking r->domains, ensure it can't race with cpuhp */
 	lockdep_assert_cpus_held();
@@ -389,9 +395,10 @@ static void show_doms(struct seq_file *s, struct resctrl_schema *schema, int clo
 			ctrl_val = dom->mbps_val[closid];
 		else
 			ctrl_val = resctrl_arch_get_config(r, dom, closid,
-							   schema->conf_type);
+							   schema->conf_type,
+							   schema->feat_type);
 
-		seq_printf(s, r->format_str, dom->id, max_data_width,
+		seq_printf(s, format_str, dom->id, max_data_width,
 			   ctrl_val);
 		sep = true;
 	}

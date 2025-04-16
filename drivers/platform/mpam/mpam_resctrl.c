@@ -68,6 +68,21 @@ bool resctrl_arch_mon_capable(void)
 	return exposed_mon_capable;
 }
 
+bool resctrl_arch_feat_capable(enum resctrl_res_level level,
+			       enum resctrl_feat_type feat)
+{
+	if (feat == FEAT_PBM) {
+		if (level == RDT_RESOURCE_L3)
+			return true;
+
+	} else if (feat == FEAT_MAX) {
+		if (level == RDT_RESOURCE_MBA)
+			return true;
+	}
+
+	return false;
+}
+
 bool resctrl_arch_is_mbm_local_enabled(void)
 {
 	return mbm_local_class;
@@ -890,7 +905,8 @@ void mpam_resctrl_exit(void)
 }
 
 u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_domain *d,
-			    u32 closid, enum resctrl_conf_type type)
+			    u32 closid, enum resctrl_conf_type type,
+			    enum resctrl_feat_type feat)
 {
 	u32 partid;
 	struct mpam_config *cfg;
@@ -914,13 +930,20 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_domain *d,
 	switch (r->rid) {
 	case RDT_RESOURCE_L2:
 	case RDT_RESOURCE_L3:
-		configured_by = mpam_feat_cpor_part;
-		break;
+		if (mpam_has_feature(mpam_feat_cpor_part, cprops) &&
+		   (feat == FEAT_PBM)) {
+			configured_by = mpam_feat_cpor_part;
+			break;
+		}
+		return -EINVAL;
+
 	case RDT_RESOURCE_MBA:
-		if (mba_class_use_mbw_part(cprops)) {
+		if (mba_class_use_mbw_part(cprops) &&
+		   (feat == FEAT_PBM)) {
 			configured_by = mpam_feat_mbw_part;
 			break;
-		} else if (mpam_has_feature(mpam_feat_mbw_max, cprops)) {
+		} else if (mpam_has_feature(mpam_feat_mbw_max, cprops) &&
+			  (feat == FEAT_MAX)) {
 			configured_by = mpam_feat_mbw_max;
 			break;
 		}
@@ -947,8 +970,9 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_domain *d,
 	}
 }
 
-int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_domain *d,
-			    u32 closid, enum resctrl_conf_type t, u32 cfg_val)
+int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_domain *d, u32 closid,
+			    enum resctrl_conf_type t, enum resctrl_feat_type f,
+			    u32 cfg_val)
 {
 	int err;
 	u32 partid;
@@ -973,16 +997,22 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_domain *d,
 	switch (r->rid) {
 	case RDT_RESOURCE_L2:
 	case RDT_RESOURCE_L3:
-		/* TODO: Scaling is not yet supported */
-		cfg.cpbm = cfg_val;
-		mpam_set_feature(mpam_feat_cpor_part, &cfg);
-		break;
+		if (mpam_has_feature(mpam_feat_cpor_part, cprops) &&
+		   (f == FEAT_PBM)) {
+			/* TODO: Scaling is not yet supported */
+			cfg.cpbm = cfg_val;
+			mpam_set_feature(mpam_feat_cpor_part, &cfg);
+			break;
+		}
+		return -EINVAL;
+
 	case RDT_RESOURCE_MBA:
-		if (mba_class_use_mbw_part(cprops)) {
+		if (mba_class_use_mbw_part(cprops) && (f == FEAT_PBM)) {
 			cfg.mbw_pbm = percent_to_mbw_pbm(cfg_val, cprops);
 			mpam_set_feature(mpam_feat_mbw_part, &cfg);
 			break;
-		} else if (mpam_has_feature(mpam_feat_mbw_max, cprops)) {
+		} else if (mpam_has_feature(mpam_feat_mbw_max, cprops) &&
+			  (f == FEAT_MAX)) {
 			cfg.mbw_max = percent_to_mbw_max(cfg_val, cprops->bwa_wd);
 			mpam_set_feature(mpam_feat_mbw_max, &cfg);
 			break;
@@ -1016,6 +1046,7 @@ int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid)
 	int err = 0;
 	struct rdt_domain *d;
 	enum resctrl_conf_type t;
+	enum resctrl_feat_type f;
 	struct resctrl_staged_config *cfg;
 
 	lockdep_assert_cpus_held();
@@ -1023,14 +1054,16 @@ int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid)
 
 	list_for_each_entry(d, &r->domains, list) {
 		for (t = 0; t < CDP_NUM_TYPES; t++) {
-			cfg = &d->staged_config[t];
-			if (!cfg->have_new_ctrl)
-				continue;
+			for (f = 0; f < FEAT_NUM_TYPES; f++) {
+				cfg = &d->staged_config[t][f];
+				if (!cfg->have_new_ctrl)
+					continue;
 
-			err = resctrl_arch_update_one(r, d, closid, t,
-						      cfg->new_ctrl);
-			if (err)
-				return err;
+				err = resctrl_arch_update_one(
+					r, d, closid, t, f, cfg->new_ctrl);
+				if (err)
+					return err;
+			}
 		}
 	}
 

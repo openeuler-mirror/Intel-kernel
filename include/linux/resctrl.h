@@ -118,7 +118,7 @@ struct rdt_domain {
 	int				mbm_work_cpu;
 	int				cqm_work_cpu;
 	struct pseudo_lock_region	*plr;
-	struct resctrl_staged_config	staged_config[CDP_NUM_TYPES];
+	struct resctrl_staged_config	staged_config[CDP_NUM_TYPES][FEAT_NUM_TYPES];
 	u32				*mbps_val;
 };
 
@@ -234,8 +234,9 @@ struct rdt_resource *resctrl_arch_get_resource(enum resctrl_res_level l);
  */
 struct resctrl_schema {
 	struct list_head		list;
-	char				name[8];
+	char				name[16];
 	enum resctrl_conf_type		conf_type;
+	enum resctrl_feat_type		feat_type;
 	struct rdt_resource		*res;
 	u32				num_closid;
 };
@@ -293,9 +294,9 @@ static inline u32 resctrl_get_config_index(u32 closid,
 	case CDP_NONE:
 		return closid;
 	case CDP_CODE:
-			return (closid * 2) + 1;
+		return (closid * 2) + 1;
 	case CDP_DATA:
-			return (closid * 2);
+		return (closid * 2);
 	}
 }
 
@@ -331,10 +332,12 @@ resctrl_get_domain_from_cpu(int cpu, struct rdt_resource *r)
  * Must be called on one of the domain's CPUs.
  */
 int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_domain *d,
-			    u32 closid, enum resctrl_conf_type t, u32 cfg_val);
+			    u32 closid, enum resctrl_conf_type t,
+			    enum resctrl_feat_type f, u32 cfg_val);
 
 u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_domain *d,
-			    u32 closid, enum resctrl_conf_type type);
+			    u32 closid, enum resctrl_conf_type type,
+			    enum resctrl_feat_type feat);
 int resctrl_online_domain(struct rdt_resource *r, struct rdt_domain *d);
 void resctrl_offline_domain(struct rdt_resource *r, struct rdt_domain *d);
 void resctrl_online_cpu(unsigned int cpu);
