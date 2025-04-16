@@ -112,6 +112,26 @@ static bool prio_validate(char *buf, unsigned long *data, struct rdt_resource *r
 	return true;
 }
 
+static bool lim_validate(char *buf, unsigned long *data, struct rdt_resource *r)
+{
+	unsigned long cap;
+	int ret;
+
+	ret = kstrtoul(buf, 10, &cap);
+	if (ret) {
+		rdt_last_cmd_printf("Non-decimal digit in limit value %s\n", buf);
+		return false;
+	}
+
+	if (cap > 1) {
+		rdt_last_cmd_printf("Limit value %ld out of range [0,1]\n", cap);
+		return false;
+	}
+
+	*data = !!cap;
+	return true;
+}
+
 static int parse_bw(struct rdt_parse_data *data, struct resctrl_schema *s,
 		    struct rdt_domain *d)
 {
@@ -128,6 +148,10 @@ static int parse_bw(struct rdt_parse_data *data, struct resctrl_schema *s,
 
 	if (s->feat_type == FEAT_INTPRI) {
 		if (!prio_validate(data->buf, &bw_val, r))
+			return -EINVAL;
+
+	} else if (s->feat_type == FEAT_LIMIT) {
+		if (!lim_validate(data->buf, &bw_val, r))
 			return -EINVAL;
 
 	} else if (r->rid == RDT_RESOURCE_MBA) {

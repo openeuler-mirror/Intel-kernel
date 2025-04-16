@@ -110,6 +110,7 @@ enum mpam_device_features {
 	mpam_feat_msmon_mbwu_rwbw,
 	mpam_feat_msmon_capt,
 	mpam_feat_partid_nrw,
+	mpam_feat_max_limit,
 	MPAM_FEATURE_LAST,
 };
 #define MPAM_ALL_FEATURES      ((1<<MPAM_FEATURE_LAST) - 1)
@@ -173,6 +174,8 @@ struct mpam_config {
 	 */
 	u16	dspri;
 	u16	intpri;
+
+	bool	max_limit;
 };
 
 struct mpam_component
@@ -459,6 +462,7 @@ void mpam_resctrl_exit(void);
 
 /* MPAMCFG_CMAX - MPAM cache portion bitmap partition configuration register */
 #define MPAMCFG_CMAX_CMAX               GENMASK(15, 0)
+#define MPAMCFG_CMAX_CMAX_SOFTLIM       BIT(31)
 
 /*
  * MPAMCFG_MBW_MIN - MPAM memory minimum bandwidth partitioning configuration

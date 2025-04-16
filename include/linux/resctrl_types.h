@@ -78,6 +78,8 @@ enum resctrl_feat_type {
 	FEAT_MAX,
 	FEAT_MIN,
 	FEAT_INTPRI,
+	FEAT_LIMIT,
+
 	FEAT_NUM_TYPES,
 };
 
