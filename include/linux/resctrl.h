@@ -79,16 +79,6 @@ struct pseudo_lock_region {
 };
 
 /**
- * struct resctrl_staged_config - parsed configuration to be applied
- * @new_ctrl:		new ctrl value to be loaded
- * @have_new_ctrl:	whether the user provided new_ctrl is valid
- */
-struct resctrl_staged_config {
-	u32			new_ctrl;
-	bool			have_new_ctrl;
-};
-
-/**
  * struct rdt_domain - group of CPUs sharing a resctrl resource
  * @list:		all instances of this resource
  * @id:			unique id for this instance
@@ -118,7 +108,7 @@ struct rdt_domain {
 	int				mbm_work_cpu;
 	int				cqm_work_cpu;
 	struct pseudo_lock_region	*plr;
-	struct resctrl_staged_config	staged_config[CDP_NUM_TYPES][FEAT_NUM_TYPES];
+	struct resctrl_arch_staged_config	staged_config[CDP_NUM_TYPES];
 	u32				*mbps_val;
 };
 
@@ -221,6 +211,11 @@ struct rdt_resource {
  * will return NULL.
  */
 struct rdt_resource *resctrl_arch_get_resource(enum resctrl_res_level l);
+
+struct resctrl_staged_config *
+resctrl_arch_get_staged_config(struct rdt_domain *domain,
+			       enum resctrl_conf_type conf_type,
+			       enum resctrl_feat_type feat_type);
 
 /**
  * struct resctrl_schema - configuration abilities of a resource presented to

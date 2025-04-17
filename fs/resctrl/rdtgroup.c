@@ -3088,7 +3088,7 @@ static int __init_one_rdt_domain(struct rdt_domain *d, struct resctrl_schema *s,
 	u32 peer_ctl, ctrl_val;
 	int i;
 
-	cfg = &d->staged_config[t][feat];
+	cfg = resctrl_arch_get_staged_config(d, t, feat);
 	cfg->have_new_ctrl = false;
 	cfg->new_ctrl = r->cache.shareable_bits;
 	used_b = r->cache.shareable_bits;
@@ -3181,7 +3181,7 @@ static void rdtgroup_init_mba(struct rdt_resource *r, u32 closid)
 			continue;
 		}
 
-		cfg = &d->staged_config[CDP_NONE][FEAT_MAX];
+		cfg = resctrl_arch_get_staged_config(d, CDP_NONE, FEAT_MAX);
 		cfg->new_ctrl = r->default_ctrl;
 		cfg->have_new_ctrl = true;
 	}

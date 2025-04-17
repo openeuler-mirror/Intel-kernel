@@ -120,6 +120,14 @@ struct rdt_resource *resctrl_arch_get_resource(enum resctrl_res_level l)
 	return &rdt_resources_all[l].r_resctrl;
 }
 
+struct resctrl_staged_config *
+resctrl_arch_get_staged_config(struct rdt_domain *domain,
+			       enum resctrl_conf_type conf_type,
+			       enum resctrl_feat_type feat_type)
+{
+	return &domain->staged_config[conf_type].config;
+}
+
 /*
  * cache_alloc_hsw_probe() - Have to probe for Intel haswell server CPUs
  * as they do not have CPUID enumeration support for Cache allocation.

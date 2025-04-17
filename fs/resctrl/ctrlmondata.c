@@ -140,7 +140,7 @@ static int parse_bw_conf_type(struct rdt_parse_data *data, struct resctrl_schema
 	struct rdt_resource *r = s->res;
 	unsigned long bw_val;
 
-	cfg = &d->staged_config[conf_type][s->feat_type];
+	cfg = resctrl_arch_get_staged_config(d, conf_type, s->feat_type);
 	if (cfg->have_new_ctrl) {
 		rdt_last_cmd_printf("Duplicate domain %d\n", d->id);
 		return -EINVAL;
@@ -257,7 +257,7 @@ static int parse_cbm(struct rdt_parse_data *data, struct resctrl_schema *s,
 	struct rdt_resource *r = s->res;
 	u32 cbm_val;
 
-	cfg = &d->staged_config[s->conf_type][s->feat_type];
+	cfg = resctrl_arch_get_staged_config(d, s->conf_type, s->feat_type);
 	if (cfg->have_new_ctrl) {
 		rdt_last_cmd_printf("Duplicate domain %d\n", d->id);
 		return -EINVAL;
@@ -361,7 +361,7 @@ next:
 			if (parse_ctrlval(&data, s, d))
 				return -EINVAL;
 			if (rdtgrp->mode ==  RDT_MODE_PSEUDO_LOCKSETUP) {
-				cfg = &d->staged_config[t][f];
+				cfg = resctrl_arch_get_staged_config(d, t, f);
 				/*
 				 * In pseudo-locking setup mode and just
 				 * parsed a valid CBM that should be

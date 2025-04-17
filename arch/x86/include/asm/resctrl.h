@@ -9,6 +9,10 @@
 #include <linux/sched.h>
 #include <linux/resctrl_types.h>
 
+struct resctrl_arch_staged_config {
+	struct resctrl_staged_config config;
+};
+
 /*
  * This value can never be a valid CLOSID, and is used when mapping a
  * (closid, rmid) pair to an index and back. On x86 only the RMID is

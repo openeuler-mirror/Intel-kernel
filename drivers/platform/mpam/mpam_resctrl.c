@@ -18,6 +18,7 @@
 #include <linux/wait.h>
 
 #include <asm/mpam.h>
+#include <asm/resctrl.h>
 
 #include "mpam_internal.h"
 
@@ -310,6 +311,14 @@ struct rdt_resource *resctrl_arch_get_resource(enum resctrl_res_level l)
 		return NULL;
 
 	return &mpam_resctrl_exports[l].resctrl_res;
+}
+
+struct resctrl_staged_config *
+resctrl_arch_get_staged_config(struct rdt_domain *domain,
+			       enum resctrl_conf_type conf_type,
+			       enum resctrl_feat_type feat_type)
+{
+	return &domain->staged_config[conf_type].config[feat_type];
 }
 
 static void *resctrl_arch_mon_ctx_alloc_no_wait(struct rdt_resource *r,
@@ -1235,7 +1244,7 @@ int resctrl_arch_update_domains(struct rdt_resource *r, u32 closid)
 	list_for_each_entry(d, &r->domains, list) {
 		for (t = 0; t < CDP_NUM_TYPES; t++) {
 			for (f = 0; f < FEAT_NUM_TYPES; f++) {
-				cfg = &d->staged_config[t][f];
+				cfg = resctrl_arch_get_staged_config(d, t, f);
 				if (!cfg->have_new_ctrl)
 					continue;
 
