@@ -2313,7 +2313,7 @@ init_driver_fail:
 	return retval;
 
 }
-device_initcall(intel_idle_init);
+fs_initcall(intel_idle_init);
 
 /*
  * We are not really modular, but we used to support that.  Meaning we also
