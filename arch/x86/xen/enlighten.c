@@ -80,6 +80,7 @@ static __ref void xen_get_vendor(void)
 	init_cpu_devs();
 	cpu_detect(&boot_cpu_data);
 	get_cpu_vendor(&boot_cpu_data);
+	init_cpu_x86_vfm(&boot_cpu_data);
 }
 
 void xen_hypercall_setfunc(void)

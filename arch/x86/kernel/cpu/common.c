@@ -930,6 +930,11 @@ void detect_ht(struct cpuinfo_x86 *c)
 #endif
 }
 
+void init_cpu_x86_vfm(struct cpuinfo_x86 *c)
+{
+	c->x86_vfm = VFM_MAKE(c->x86_vendor, c->x86, c->x86_model);
+}
+
 void get_cpu_vendor(struct cpuinfo_x86 *c)
 {
 	char *v = c->x86_vendor_id;
@@ -1663,6 +1668,8 @@ static void __init early_identify_cpu(struct cpuinfo_x86 *c)
 		setup_clear_cpu_cap(X86_FEATURE_CPUID);
 	}
 
+	init_cpu_x86_vfm(c);
+
 	setup_force_cpu_cap(X86_FEATURE_ALWAYS);
 
 	cpu_set_bug_bits(c);
@@ -1808,6 +1815,8 @@ static void generic_identify(struct cpuinfo_x86 *c)
 
 	get_cpu_vendor(c);
 
+	init_cpu_x86_vfm(c);
+
 	get_cpu_cap(c);
 
 	get_cpu_address_sizes(c);
@@ -1877,6 +1886,7 @@ static void identify_cpu(struct cpuinfo_x86 *c)
 	c->x86_cache_size = 0;
 	c->x86_vendor = X86_VENDOR_UNKNOWN;
 	c->x86_model = c->x86_stepping = 0;	/* So far unknown... */
+	c->x86_vfm = VFM_MAKE(c->x86_vendor, c->x86, c->x86_model);
 	c->x86_vendor_id[0] = '\0'; /* Unset */
 	c->x86_model_id[0] = '\0';  /* Unset */
 	c->x86_max_cores = 1;
@@ -1929,6 +1939,12 @@ static void identify_cpu(struct cpuinfo_x86 *c)
 	 */
 	if (this_cpu->c_init)
 		this_cpu->c_init(c);
+
+	/*
+	 * Cyrix may change x86_vendor/x86_model in ->c_identify()/c_init(),
+	 * reinit x86_vfm in case anything changed.
+	 */
+	init_cpu_x86_vfm(c);
 
 	/* Disable the PN if appropriate */
 	squash_the_stupid_serial_number(c);

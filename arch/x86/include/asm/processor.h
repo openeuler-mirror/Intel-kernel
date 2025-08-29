@@ -86,23 +86,9 @@ struct cpuinfo_x86_resvd {
  */
 
 struct cpuinfo_x86 {
-	union {
-		/*
-		 * The particular ordering (low-to-high) of (vendor,
-		 * family, model) is done in case range of models, like
-		 * it is usually done on AMD, need to be compared.
-		 */
-		struct {
-			__u8	x86_model;
-			/* CPU family */
-			__u8	x86;
-			/* CPU vendor */
-			__u8	x86_vendor;
-			__u8	x86_reserved;
-		};
-		/* combined vendor, family, model */
-		__u32		x86_vfm;
-	};
+	__u8			x86;		/* CPU family */
+	__u8			x86_vendor;	/* CPU vendor */
+	__u8			x86_model;
 	__u8			x86_stepping;
 #ifdef CONFIG_X86_64
 	/* Number of 4K pages in DTLB/ITLB combined(in pages): */
@@ -165,7 +151,7 @@ struct cpuinfo_x86 {
 	/* Address space bits used by the cache internally */
 	u8			x86_cache_bits;
 	unsigned		initialized : 1;
-	KABI_RESERVE(1)
+	KABI_USE(1, __u32 x86_vfm)
 	KABI_RESERVE(2)
 	KABI_RESERVE(3)
 	KABI_RESERVE(4)
@@ -216,6 +202,7 @@ static inline unsigned long long l1tf_pfn_limit(void)
 
 void init_cpu_devs(void);
 void get_cpu_vendor(struct cpuinfo_x86 *c);
+extern void init_cpu_x86_vfm(struct cpuinfo_x86 *c);
 extern void early_cpu_init(void);
 extern void identify_secondary_cpu(struct cpuinfo_x86 *);
 extern void print_cpu_info(struct cpuinfo_x86 *);
