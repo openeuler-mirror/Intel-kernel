@@ -224,6 +224,9 @@ struct msmon_mbwu_state {
 	bool		reset_on_next_read;
 	struct mon_cfg	cfg;
 
+	/* The value last read from the hardware. Used to detect overflow. */
+	u64		prev_val;
+
 	/*
 	 * The value to add to the new reading to account for power management,
 	 * and shifts to trigger the overflow interrupt.
