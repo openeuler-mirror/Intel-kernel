@@ -307,9 +307,6 @@ static int rdtgroup_parse_resource(char *resname, char *tok,
 	struct resctrl_schema *s;
 
 	list_for_each_entry(s, &resctrl_schema_all, list) {
-		if (s->res->invisible)
-			continue;
-
 		if (!strcmp(resname, s->name) && rdtgrp->closid < s->num_closid)
 			return parse_line(tok, s, rdtgrp);
 	}
@@ -454,9 +451,6 @@ int rdtgroup_schemata_show(struct kernfs_open_file *of,
 		} else {
 			closid = rdtgrp->closid;
 			list_for_each_entry(schema, &resctrl_schema_all, list) {
-				if (schema->res->invisible)
-					continue;
-
 				if (closid < schema->num_closid)
 					show_doms(s, schema, closid);
 			}
