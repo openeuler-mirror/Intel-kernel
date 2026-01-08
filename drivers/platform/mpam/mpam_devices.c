@@ -577,8 +577,7 @@ static void mpam_ris_hw_probe(struct mpam_msc_ris *ris)
 		u32 ccap_features = mpam_read_partsel_reg(msc, CCAP_IDR);
 
 		props->cmax_wd = FIELD_GET(MPAMF_CCAP_IDR_CMAX_WD, ccap_features);
-		if (props->cmax_wd &&
-		   !FIELD_GET(MPAMF_CCAP_IDR_NO_CMAX, ccap_features))
+		if (props->cmax_wd)
 			mpam_set_feature(mpam_feat_ccap_part, props);
 	}
 
