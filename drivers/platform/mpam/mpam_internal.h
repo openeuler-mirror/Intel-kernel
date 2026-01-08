@@ -55,6 +55,7 @@ struct mpam_msc
 
 	struct mutex		lock;
 	bool			probed;
+	bool			skipped;
 	bool			error_irq_requested;
 	bool			error_irq_hw_enabled;
 	u16			partid_max;
