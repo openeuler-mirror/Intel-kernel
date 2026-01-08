@@ -4049,8 +4049,7 @@ static int domain_setup_mon_state(struct rdt_resource *r, struct rdt_domain *d)
 		d->mbm_core = kcalloc(idx_limit, tsize, GFP_KERNEL);
 		if (!d->mbm_core) {
 			bitmap_free(d->rmid_busy_llc);
-			kfree(d->mbm_total);
-			kfree(d->mbm_local);
+			kfree(d->mbm_core);
 			return -ENOMEM;
 		}
 	}
