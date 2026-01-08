@@ -2576,7 +2576,6 @@ int mpam_apply_config(struct mpam_component *comp, u16 partid,
 		arg.ris = ris;
 		mutex_lock(&ris->msc->lock);
 		mpam_touch_msc(ris->msc, __write_config, &arg);
-		ris->in_reset_state = false;
 		mutex_unlock(&ris->msc->lock);
 	}
 	srcu_read_unlock(&mpam_srcu, idx);
