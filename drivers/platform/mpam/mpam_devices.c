@@ -1858,10 +1858,9 @@ __resource_props_mismatch(struct mpam_msc_ris *ris, struct mpam_class *class)
 	/* Clear missing features */
 	cprops->features &= rprops->features;
 
-	/* Set cpbm_wd with the min cpbm_wd among all cache msc */
+	/* Clear incompatible features */
 	if (cprops->cpbm_wd != rprops->cpbm_wd)
-		cprops->cpbm_wd = min(cprops->cpbm_wd, rprops->cpbm_wd);
-
+		mpam_clear_feature(mpam_feat_cpor_part, &cprops->features);
 	if (cprops->mbw_pbm_bits != rprops->mbw_pbm_bits)
 		mpam_clear_feature(mpam_feat_mbw_part, &cprops->features);
 
