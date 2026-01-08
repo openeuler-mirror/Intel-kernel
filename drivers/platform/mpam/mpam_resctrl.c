@@ -298,6 +298,7 @@ struct rdt_resource *resctrl_arch_get_resource(enum resctrl_res_level l)
 static void *resctrl_arch_mon_ctx_alloc_no_wait(struct rdt_resource *r,
 						int evtid)
 {
+	struct mpam_resctrl_res *res;
 	u32 *ret = kmalloc(sizeof(*ret), GFP_KERNEL);
 
 	if (!ret)
@@ -305,6 +306,11 @@ static void *resctrl_arch_mon_ctx_alloc_no_wait(struct rdt_resource *r,
 
 	switch (evtid) {
 	case QOS_L3_OCCUP_EVENT_ID:
+		res = container_of(r, struct mpam_resctrl_res, resctrl_res);
+
+		*ret = mpam_alloc_csu_mon(res->class);
+		return ret;
+
 	case QOS_L3_MBM_LOCAL_EVENT_ID:
 	case QOS_L3_MBM_TOTAL_EVENT_ID:
 		*ret = __mon_is_rmid_idx;
@@ -338,7 +344,21 @@ void *resctrl_arch_mon_ctx_alloc(struct rdt_resource *r, int evtid)
 void resctrl_arch_mon_ctx_free(struct rdt_resource *r, int evtid,
 			       void *arch_mon_ctx)
 {
+	struct mpam_resctrl_res *res;
+	u32 mon = *(u32 *)arch_mon_ctx;
+
 	kfree(arch_mon_ctx);
+
+	switch (evtid) {
+	case QOS_L3_OCCUP_EVENT_ID:
+		res = container_of(r, struct mpam_resctrl_res, resctrl_res);
+		mpam_free_csu_mon(res->class, mon);
+		wake_up(&resctrl_mon_ctx_waiters);
+		return;
+	case QOS_L3_MBM_TOTAL_EVENT_ID:
+	case QOS_L3_MBM_LOCAL_EVENT_ID:
+		return;
+	}
 }
 
 static enum mon_filter_options resctrl_evt_config_to_mpam(u32 local_evt_cfg)
@@ -359,7 +379,7 @@ int resctrl_arch_rmid_read(struct rdt_resource	*r, struct rdt_domain *d,
 {
 	int err;
 	u64 cdp_val;
-	u16 num_mon;
+	u16 num_mbwu_mon;
 	struct mon_cfg cfg;
 	struct mpam_resctrl_dom *dom;
 	struct mpam_resctrl_res *res;
@@ -386,15 +406,12 @@ int resctrl_arch_rmid_read(struct rdt_resource	*r, struct rdt_domain *d,
 	if (cfg.mon == USE_RMID_IDX) {
 		/*
 		 * The number of mbwu monitors can't support free run mode,
-		 * adapt the remainder of rmid to the num_mon as compromise.
+		 * adapt the remainder of rmid to the num_mbwu_mon as a
+		 * compromise.
 		 */
 		res = container_of(r, struct mpam_resctrl_res, resctrl_res);
-		if (type == mpam_feat_msmon_mbwu)
-			num_mon = res->class->props.num_mbwu_mon;
-		else
-			num_mon = res->class->props.num_csu_mon;
-
-		cfg.mon = closid % num_mon;
+		num_mbwu_mon = res->class->props.num_mbwu_mon;
+		cfg.mon = resctrl_arch_rmid_idx_encode(closid, rmid) % num_mbwu_mon;
 	}
 
 	cfg.match_pmg = true;
