@@ -221,8 +221,8 @@ static int __init _parse_table(struct acpi_table_header *table)
 		memset(props, 0, sizeof(props));
 
 		pdev = platform_device_alloc("mpam_msc", tbl_msc->identifier);
-		if (!pdev) {
-			err = -ENOMEM;
+		if (IS_ERR(pdev)) {
+			err = PTR_ERR(pdev);
 			break;
 		}
 
