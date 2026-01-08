@@ -2364,19 +2364,9 @@ bool mpam_detect_is_enabled(void)
 	return mpam_force_enabled;
 }
 
-static bool __read_mostly mpam_mb_only;
-bool mpam_only_enable_mb(void)
-{
-	return mpam_mb_only;
-}
-
 static int __init mpam_setup(char *str)
 {
 	mpam_force_enabled = true;
-
-	if (str && !strcmp(str, "mb_only"))
-		mpam_mb_only = true;
-
 	return 0;
 }
 early_param("arm64.mpam", mpam_setup);

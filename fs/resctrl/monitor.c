@@ -790,6 +790,9 @@ out_unlock:
 
 static void dom_data_exit(struct rdt_resource *r)
 {
+	if (!r->mon_capable)
+		return;
+
 	mutex_lock(&rdtgroup_mutex);
 	if (IS_ENABLED(CONFIG_RESCTRL_RMID_DEPENDS_ON_CLOSID)) {
 		kfree(closid_num_dirty_rmid);
@@ -804,15 +807,10 @@ static void dom_data_exit(struct rdt_resource *r)
 
 int resctrl_mon_resource_init(void)
 {
-	struct rdt_resource *r;
-	int i, ret;
+	struct rdt_resource *r = resctrl_arch_get_resource(RDT_RESOURCE_L3);
+	int ret;
 
-	for (i = 0; i < RDT_NUM_RESOURCES; i++) {
-		r = resctrl_arch_get_resource(i);
-		if (r->mon_capable)
-			break;
-	}
-	if (i == RDT_NUM_RESOURCES)
+	if (!r->mon_capable)
 		return 0;
 
 	ret = dom_data_init(r);
@@ -824,16 +822,7 @@ int resctrl_mon_resource_init(void)
 
 void resctrl_mon_resource_exit(void)
 {
-	struct rdt_resource *r;
-	int i;
-
-	for (i = 0; i < RDT_NUM_RESOURCES; i++) {
-		r = resctrl_arch_get_resource(i);
-		if (r->mon_capable)
-			break;
-	}
-	if (i == RDT_NUM_RESOURCES)
-		return;
+	struct rdt_resource *r = resctrl_arch_get_resource(RDT_RESOURCE_L3);
 
 	dom_data_exit(r);
 }
