@@ -4118,14 +4118,14 @@ out_unlock:
 }
 
 /*
- * resctrl_init - resctrl filesystem initialization
+ * rdtgroup_init - rdtgroup initialization
  *
  * Setup resctrl file system including set up root, create mount point,
- * register resctrl filesystem, and initialize files under root directory.
+ * register rdtgroup filesystem, and initialize files under root directory.
  *
  * Return: 0 on success or -errno
  */
-int __init resctrl_init(void)
+int __init rdtgroup_init(void)
 {
 	int ret = 0;
 
@@ -4173,7 +4173,7 @@ cleanup_mountpoint:
 	return ret;
 }
 
-void __exit resctrl_exit(void)
+void __exit rdtgroup_exit(void)
 {
 	debugfs_remove_recursive(debugfs_resctrl);
 	unregister_filesystem(&rdt_fs_type);

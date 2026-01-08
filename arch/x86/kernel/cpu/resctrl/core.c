@@ -953,7 +953,7 @@ void resctrl_cpu_detect(struct cpuinfo_x86 *c)
 	}
 }
 
-static int __init resctrl_arch_late_init(void)
+static int __init resctrl_late_init(void)
 {
 	struct rdt_resource *r;
 	int state, ret;
@@ -978,7 +978,7 @@ static int __init resctrl_arch_late_init(void)
 	if (state < 0)
 		return state;
 
-	ret = resctrl_init();
+	ret = rdtgroup_init();
 	if (ret) {
 		cpuhp_remove_state(state);
 		return ret;
@@ -994,9 +994,9 @@ static int __init resctrl_arch_late_init(void)
 	return 0;
 }
 
-late_initcall(resctrl_arch_late_init);
+late_initcall(resctrl_late_init);
 
-static void __exit resctrl_arch_exit(void)
+static void __exit resctrl_exit(void)
 {
 	struct rdt_resource *r = resctrl_arch_get_resource(RDT_RESOURCE_L3);
 
@@ -1008,4 +1008,4 @@ static void __exit resctrl_arch_exit(void)
 		rdt_put_mon_l3_config(r);
 }
 
-__exitcall(resctrl_arch_exit);
+__exitcall(resctrl_exit);
