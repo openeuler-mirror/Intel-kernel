@@ -558,14 +558,6 @@ static bool class_has_usable_mbw_min(struct mpam_props *cprops)
 	return false;
 }
 
-static bool class_has_usable_intpri(struct mpam_props *cprops)
-{
-	if (mpam_has_feature(mpam_feat_intpri_part, cprops))
-		return true;
-
-	return false;
-}
-
 /*
  * Calculate the percentage change from each implemented bit in the control
  * This can return 0 when BWA_WD is greater than 6. (100 / (1<<7) == 0)
@@ -671,7 +663,7 @@ static void mpam_resctrl_pick_caches(void)
 	unsigned int cache_size;
 	struct mpam_class *class;
 	struct mpam_resctrl_res *res;
-	bool has_cpor, has_cmax, has_cmin, has_intpri;
+	bool has_cpor, has_cmax, has_cmin;
 
 	lockdep_assert_cpus_held();
 
@@ -682,7 +674,6 @@ static void mpam_resctrl_pick_caches(void)
 		has_cpor = cache_has_usable_cpor(class);
 		has_cmax = cache_has_usable_cmax(class);
 		has_cmin = cache_has_usable_cmin(class);
-		has_intpri = class_has_usable_intpri(cprops);
 
 		if (class->type != MPAM_CLASS_CACHE) {
 			pr_debug("pick_caches: Class is not a cache\n");
@@ -750,17 +741,6 @@ static void mpam_resctrl_pick_caches(void)
 			}
 			res->class = class;
 		}
-
-		if (has_intpri) {
-			if (class->level == 2) {
-				res = &mpam_resctrl_exports[RDT_RESOURCE_L2_PRI];
-				res->resctrl_res.name = "L2PRI";
-			} else {
-				res = &mpam_resctrl_exports[RDT_RESOURCE_L3_PRI];
-				res->resctrl_res.name = "L3PRI";
-			}
-			res->class = class;
-		}
 	}
 	srcu_read_unlock(&mpam_srcu, idx);
 }
@@ -768,7 +748,7 @@ static void mpam_resctrl_pick_caches(void)
 static void mpam_resctrl_pick_mba(void)
 {
 	struct mpam_resctrl_res *res;
-	bool has_mba, has_mbw_min, has_intpri;
+	bool has_mba, has_mbw_min;
 	struct mpam_class *class;
 	int idx;
 
@@ -780,7 +760,6 @@ static void mpam_resctrl_pick_mba(void)
 
 		has_mba = class_has_usable_mba(cprops);
 		has_mbw_min = class_has_usable_mbw_min(cprops);
-		has_intpri = class_has_usable_intpri(cprops);
 
 		if (class->level < 3)
 			continue;
@@ -798,12 +777,6 @@ static void mpam_resctrl_pick_mba(void)
 			res = &mpam_resctrl_exports[RDT_RESOURCE_MB_MIN];
 			res->class = class;
 			res->resctrl_res.name = "MBMIN";
-		}
-
-		if (has_intpri) {
-			res = &mpam_resctrl_exports[RDT_RESOURCE_MB_PRI];
-			res->class = class;
-			res->resctrl_res.name = "MBPRI";
 		}
 	}
 	srcu_read_unlock(&mpam_srcu, idx);
@@ -996,35 +969,6 @@ static int mpam_resctrl_resource_init(struct mpam_resctrl_res *res)
 			r->alloc_capable = true;
 		break;
 
-	case RDT_RESOURCE_L3_PRI:
-	case RDT_RESOURCE_L2_PRI:
-		r->format_str = "%d=%0*u";
-		r->schema_fmt = RESCTRL_SCHEMA_RANGE;
-		r->fflags = RFTYPE_RES_CACHE;
-		r->default_ctrl = GENMASK(cprops->intpri_wd - 1, 0);
-		r->data_width = 3;
-		r->cache_level = class->level;
-
-		if (class_has_usable_intpri(cprops))
-			r->alloc_capable = true;
-
-		r->membw.min_bw = 0;
-		r->membw.bw_gran = 1;
-		break;
-
-	case RDT_RESOURCE_MB_PRI:
-		r->format_str = "%d=%0*u";
-		r->schema_fmt = RESCTRL_SCHEMA_RANGE;
-		r->fflags = RFTYPE_RES_MB;
-		r->default_ctrl = GENMASK(cprops->intpri_wd - 1, 0);
-		r->data_width = 3;
-
-		r->membw.bw_gran = 1;
-
-		if (class_has_usable_intpri(cprops))
-			r->alloc_capable = true;
-		break;
-
 	default:
 		break;
 	}
@@ -1151,11 +1095,6 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_domain *d,
 	case RDT_RESOURCE_L3_MIN:
 		configured_by = mpam_feat_cmin;
 		break;
-	case RDT_RESOURCE_L2_PRI:
-	case RDT_RESOURCE_L3_PRI:
-	case RDT_RESOURCE_MB_PRI:
-		configured_by = mpam_feat_intpri_part;
-		break;
 
 	case RDT_RESOURCE_MBA:
 		if (mba_class_use_mbw_part(cprops)) {
@@ -1187,8 +1126,6 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_domain *d,
 		return mbw_max_to_percent(cfg->cmax, cprops->cmax_wd);
 	case mpam_feat_cmin:
 		return mbw_max_to_percent(cfg->cmin, cprops->cmax_wd);
-	case mpam_feat_intpri_part:
-		return cfg->intpri;
 	case mpam_feat_mbw_part:
 		/* TODO: Scaling is not yet supported */
 		return mbw_pbm_to_percent(cfg->mbw_pbm, cprops);
@@ -1241,12 +1178,6 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_domain *d,
 	case RDT_RESOURCE_L3_MIN:
 		cfg.cmin = percent_to_mbw_max(cfg_val, cprops->cmax_wd);
 		mpam_set_feature(mpam_feat_cmin, &cfg);
-		break;
-	case RDT_RESOURCE_L2_PRI:
-	case RDT_RESOURCE_L3_PRI:
-	case RDT_RESOURCE_MB_PRI:
-		cfg.intpri = cfg_val;
-		mpam_set_feature(mpam_feat_intpri_part, &cfg);
 		break;
 	case RDT_RESOURCE_MBA:
 		if (mba_class_use_mbw_part(cprops)) {
