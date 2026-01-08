@@ -562,28 +562,6 @@ static struct mpam_msc_ris *mpam_get_or_create_ris(struct mpam_msc *msc,
 	return found;
 }
 
-u16 mpam_cpbm_wd_hisi_workaround(u16 cpbm_wd, enum mpam_device_features feat,
-				 u8 cache_level)
-{
-	static const struct midr_range cpus[] = {
-		MIDR_ALL_VERSIONS(MIDR_HISI_HIP12),
-		{ /* sentinel */ }
-	};
-
-	if (cache_level != 3)
-		return cpbm_wd;
-
-	if (is_midr_in_range_list(cpus)) {
-		if (feat == mpam_feat_cpor_part)
-			return 19;
-		else if (feat == mpam_feat_ccap_part ||
-			 feat == mpam_feat_cmin)
-			return 21;
-	}
-
-	return cpbm_wd;
-}
-
 static void mpam_ris_hw_probe(struct mpam_msc_ris *ris)
 {
 	int err;
@@ -613,9 +591,7 @@ static void mpam_ris_hw_probe(struct mpam_msc_ris *ris)
 	if (FIELD_GET(MPAMF_IDR_HAS_CPOR_PART, ris->idr)) {
 		u32 cpor_features = mpam_read_partsel_reg(msc, CPOR_IDR);
 
-		props->cpbm_wd = mpam_cpbm_wd_hisi_workaround(
-				 FIELD_GET(MPAMF_CPOR_IDR_CPBM_WD, cpor_features),
-				 mpam_feat_cpor_part, class->level);
+		props->cpbm_wd = FIELD_GET(MPAMF_CPOR_IDR_CPBM_WD, cpor_features);
 		if (props->cpbm_wd)
 			mpam_set_feature(mpam_feat_cpor_part, props);
 	}
@@ -1236,28 +1212,6 @@ static void mpam_reset_msc_bitmap(struct mpam_msc *msc, u16 reg, u16 wd)
 		__mpam_write_reg(msc, reg, bm);
 }
 
-static u32 mpam_cpbm_hisi_workaround(u32 cpbm, u8 cache_level)
-{
-	static const struct midr_range cpus[] = {
-		MIDR_ALL_VERSIONS(MIDR_HISI_HIP12),
-		{ /* sentinel */ }
-	};
-
-	if (cache_level != 3 ||
-	   !is_midr_in_range_list(cpus))
-		return cpbm;
-
-	if (cpbm & BIT(18))
-		cpbm |= (BIT(19) | BIT(20));
-
-	if (cpbm & BIT(17))
-		cpbm |= BIT(18);
-	else
-		cpbm &= ~BIT(18);
-
-	return cpbm;
-}
-
 static void mpam_reprogram_ris_partid(struct mpam_msc_ris *ris, u16 partid,
 				      struct mpam_config *cfg)
 {
@@ -1278,15 +1232,10 @@ static void mpam_reprogram_ris_partid(struct mpam_msc_ris *ris, u16 partid,
 
 	if (mpam_has_feature(mpam_feat_cpor_part, rprops)) {
 		if (mpam_has_feature(mpam_feat_cpor_part, cfg))
-			mpam_write_partsel_reg(msc, CPBM,
-				mpam_cpbm_hisi_workaround(cfg->cpbm,
-						ris->comp->class->level));
+			mpam_write_partsel_reg(msc, CPBM, cfg->cpbm);
 		else
 			mpam_reset_msc_bitmap(msc, MPAMCFG_CPBM,
-				mpam_cpbm_wd_hisi_workaround(
-						rprops->cpbm_wd,
-						mpam_feat_cpor_part,
-						ris->comp->class->level));
+					      rprops->cpbm_wd);
 	}
 
 	if (mpam_has_feature(mpam_feat_ccap_part, rprops)) {
