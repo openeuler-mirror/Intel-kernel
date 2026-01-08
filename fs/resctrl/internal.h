@@ -97,6 +97,7 @@ struct rmid_read {
 };
 
 extern struct list_head resctrl_schema_all;
+extern bool resctrl_mounted;
 
 enum rdt_group_type {
 	RDTCTRL_GROUP = 0,
