@@ -507,7 +507,7 @@ void mon_event_read(struct rmid_read *rr, struct rdt_resource *r,
 	 * MPAM's resctrl_arch_rmid_read() is unable to read the
 	 * counters on some platforms if its called in irq context.
 	 */
-	if (tick_nohz_full_cpu(cpu) && !IS_ENABLED(CONFIG_ARM64_MPAM))
+	if (tick_nohz_full_cpu(cpu))
 		smp_call_function_any(&d->cpu_mask, mon_event_count, rr, 1);
 	else
 		smp_call_on_cpu(cpu, smp_mon_event_count, rr, false);
