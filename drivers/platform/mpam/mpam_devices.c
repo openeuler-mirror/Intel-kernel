@@ -388,7 +388,7 @@ static int get_cpumask_from_cache_id(u32 cache_id, u32 cache_level,
 			 * during device_initcall(). Use cache_of_get_id().
 			 */
 			iter_cache_id = cache_of_get_id(iter);
-			if (cache_id == (~0)) {
+			if (cache_id == ~0UL) {
 				of_node_put(iter);
 				continue;
 			}
