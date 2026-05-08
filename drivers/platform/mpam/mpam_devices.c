@@ -1529,8 +1529,11 @@ static int mpam_discovery_cpu_online(unsigned int cpu)
 
 	mutex_lock(&mpam_list_lock);
 	list_for_each_entry(msc, &mpam_all_msc, glbl_list) {
-		if (!cpumask_test_cpu(cpu, &msc->accessibility))
+		if (!cpumask_test_cpu(cpu, &msc->accessibility)) {
+			msc->probed = true;
+			msc->skipped = true;
 			continue;
+		}
 
 		mutex_lock(&msc->lock);
 		if (!msc->probed)
@@ -1948,7 +1951,7 @@ static void mpam_enable_init_class_features(struct mpam_class *class)
 
 	list_for_each_entry(comp, &class->components, class_list) {
 		list_for_each_entry(ris, &comp->ris, comp_list) {
-			if (ris->msc->probed)
+			if (!ris->msc->skipped)
 				break;
 		}
 	}
@@ -1973,7 +1976,7 @@ static void mpam_enable_merge_features(void)
 
 		list_for_each_entry(comp, &class->components, class_list) {
 			list_for_each_entry(ris, &comp->ris, comp_list) {
-				if (!ris->msc->probed)
+				if (ris->msc->skipped)
 					continue;
 
 				__resource_props_mismatch(ris, class);
@@ -2349,7 +2352,6 @@ void mpam_disable(struct work_struct *ignored)
  */
 void mpam_enable(struct work_struct *work)
 {
-	cpumask_t mask;
 	static atomic_t once;
 	struct mpam_msc *msc;
 	bool all_devices_probed = true;
@@ -2357,11 +2359,8 @@ void mpam_enable(struct work_struct *work)
 	mutex_lock(&mpam_list_lock);
 	list_for_each_entry(msc, &mpam_all_msc, glbl_list) {
 		mutex_lock(&msc->lock);
-		if (!msc->probed) {
-			cpumask_and(&mask, &msc->accessibility, cpu_online_mask);
-			if (!cpumask_empty(&mask))
-				all_devices_probed = false;
-		}
+		if (!msc->probed)
+			all_devices_probed = false;
 		mutex_unlock(&msc->lock);
 
 		if (!all_devices_probed)
