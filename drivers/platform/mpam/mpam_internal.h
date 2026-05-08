@@ -90,7 +90,6 @@ enum mpam_device_features {
 	mpam_feat_mbw_part,
 	mpam_feat_mbw_min,
 	mpam_feat_mbw_max,
-	mpam_feat_max_limit,
 	mpam_feat_mbw_prop,
 	mpam_feat_intpri_part,
 	mpam_feat_intpri_part_0_low,
@@ -165,7 +164,6 @@ struct mpam_config {
 	u32	mbw_pbm;
 	u16	mbw_max;
 	u16	mbw_min;
-	bool	max_limit;
 	u16	cmax;
 	u16	cmin;
 
