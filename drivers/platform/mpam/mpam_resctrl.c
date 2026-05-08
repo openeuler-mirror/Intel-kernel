@@ -1244,13 +1244,6 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_domain *d,
 	dom = container_of(d, struct mpam_resctrl_dom, resctrl_dom);
 	cprops = &res->class->props;
 
-	/*
-	 * For resources that don't support CDP, both CDP_CODE and
-	 * CDP_DATA map to the same configuration.
-	 */
-	if (mpam_resctrl_hide_cdp(r->rid))
-		type = CDP_DATA;
-
 	partid = resctrl_get_config_index(closid, type);
 	cfg = &dom->comp->cfg[partid];
 
@@ -1341,9 +1334,6 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_domain *d,
 	res = container_of(r, struct mpam_resctrl_res, resctrl_res);
 	dom = container_of(d, struct mpam_resctrl_dom, resctrl_dom);
 	cprops = &res->class->props;
-
-	if (mpam_resctrl_hide_cdp(r->rid))
-		t = CDP_DATA;
 
 	partid = resctrl_get_config_index(closid, t);
 	if (!r->alloc_capable || partid >= resctrl_arch_get_num_closid(r))
