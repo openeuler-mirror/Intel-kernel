@@ -194,7 +194,7 @@ enum mon_filter_options {
 };
 
 struct mon_cfg {
-	u32                     mon;
+	u16                     mon;
 	u8                      pmg;
 	bool                    match_pmg;
 	u32                     partid;
