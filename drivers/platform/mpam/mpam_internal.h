@@ -97,12 +97,6 @@ static inline void mpam_set_feature(enum mpam_device_features feat,
 	props->features |= (1<<feat);
 }
 
-static inline void mpam_clear_feature(enum mpam_device_features feat,
-				      mpam_features_t *supported)
-{
-	*supported &= ~(1<<feat);
-}
-
 struct mpam_class
 {
 	/* mpam_components in this class */
@@ -110,8 +104,6 @@ struct mpam_class
 
 	cpumask_t		affinity;
 
-	struct mpam_props	props;
-	u32			nrdy_usec;
 	u8			level;
 	enum mpam_class_types	type;
 
