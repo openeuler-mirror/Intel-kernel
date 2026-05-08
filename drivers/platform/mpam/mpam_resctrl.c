@@ -691,9 +691,7 @@ static u16 percent_to_ca_max(u32 pc, u8 wd)
 	if (read_cpuid_implementor() != ARM_CPU_IMP_HISI)
 		return percent_to_mbw_max(pc, wd);
 
-	valid_max = mpam_cpbm_wd_hisi_workaround(l3->cache.cbm_len,
-						 mpam_feat_ccap_part,
-						 l3->cache_level);
+	valid_max = l3->cache.cbm_len;
 
 	if (pc >= MAX_MBA_BW)
 		return valid_max << (16 - wd);
@@ -709,9 +707,7 @@ static u16 ca_max_to_percent(u16 ca_max, u8 wd)
 	if (read_cpuid_implementor() != ARM_CPU_IMP_HISI)
 		return mbw_max_to_percent(ca_max, wd);
 
-	valid_max = mpam_cpbm_wd_hisi_workaround(l3->cache.cbm_len,
-						 mpam_feat_ccap_part,
-						 l3->cache_level);
+	valid_max = l3->cache.cbm_len;
 
 	ca_max = ca_max >> (16 - wd);
 	if (ca_max >= valid_max)
