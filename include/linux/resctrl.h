@@ -217,7 +217,6 @@ struct rdt_resource {
 	bool			alloc_capable;
 	bool			mon_capable;
 	bool			invisible;
-	bool			is_volatile;
 	int			num_rmid;
 	int			cache_level;
 	struct resctrl_cache	cache;
@@ -435,8 +434,6 @@ void resctrl_arch_reset_rmid_all(struct rdt_resource *r, struct rdt_domain *d);
 
 extern unsigned int resctrl_rmid_realloc_threshold;
 extern unsigned int resctrl_rmid_realloc_limit;
-
-extern bool resctrl_mounted;
 
 int resctrl_init(void);
 void resctrl_exit(void);

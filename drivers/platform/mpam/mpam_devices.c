@@ -1554,12 +1554,8 @@ static int mpam_discovery_cpu_online(unsigned int cpu)
 
 static int mpam_cpu_offline(unsigned int cpu)
 {
-	int ret, idx;
+	int idx;
 	struct mpam_msc *msc;
-
-	ret = mpam_resctrl_prepare_offline();
-	if (ret)
-		return ret;
 
 	idx = srcu_read_lock(&mpam_srcu);
 	list_for_each_entry_rcu(msc, &mpam_all_msc, glbl_list) {
