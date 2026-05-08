@@ -4118,10 +4118,6 @@ static int arm_smmu_group_set_mpam(struct iommu_group *group, u16 partid,
 
 	domain = iommu_get_domain_for_group(group);
 	smmu_domain = to_smmu_domain(domain);
-
-	if (!smmu_domain->smmu)
-		return -EINVAL;
-
 	if (!(smmu_domain->smmu->features & ARM_SMMU_FEAT_MPAM))
 		return -EIO;
 	smmu = smmu_domain->smmu;
@@ -4167,10 +4163,6 @@ static int arm_smmu_group_get_mpam(struct iommu_group *group, u16 *partid,
 
 	domain = iommu_get_domain_for_group(group);
 	smmu_domain = to_smmu_domain(domain);
-
-	if (!smmu_domain->smmu)
-		return 0;
-
 	if (!(smmu_domain->smmu->features & ARM_SMMU_FEAT_MPAM))
 		return -EIO;
 
