@@ -336,10 +336,8 @@ int resctrl_arch_rmid_read(struct rdt_resource	*r, struct rdt_domain *d,
 {
 	int err;
 	u64 cdp_val;
-	u16 num_mbwu_mon;
 	struct mon_cfg cfg;
 	struct mpam_resctrl_dom *dom;
-	struct mpam_resctrl_res *res;
 	u32 mon = *(u32 *)arch_mon_ctx;
 	enum mpam_device_features type;
 
@@ -360,16 +358,8 @@ int resctrl_arch_rmid_read(struct rdt_resource	*r, struct rdt_domain *d,
 	}
 
 	cfg.mon = mon;
-	if (cfg.mon == USE_RMID_IDX) {
-		/*
-		 * The number of mbwu monitors can't support free run mode,
-		 * adapt the remainder of rmid to the num_mbwu_mon as a
-		 * compromise.
-		 */
-		res = container_of(r, struct mpam_resctrl_res, resctrl_res);
-		num_mbwu_mon = res->class->props.num_mbwu_mon;
-		cfg.mon = resctrl_arch_rmid_idx_encode(closid, rmid) % num_mbwu_mon;
-	}
+	if (cfg.mon == USE_RMID_IDX)
+		cfg.mon = resctrl_arch_rmid_idx_encode(closid, rmid);
 
 	cfg.match_pmg = true;
 	cfg.pmg = rmid;
@@ -396,17 +386,13 @@ int resctrl_arch_rmid_read(struct rdt_resource	*r, struct rdt_domain *d,
 void resctrl_arch_reset_rmid(struct rdt_resource *r, struct rdt_domain *d,
 			     u32 closid, u32 rmid, enum resctrl_event_id eventid)
 {
-	u16 num_mbwu_mon;
 	struct mon_cfg cfg;
 	struct mpam_resctrl_dom *dom;
-	struct mpam_resctrl_res *res;
 
 	if (eventid != QOS_L3_MBM_LOCAL_EVENT_ID)
 		return;
 
-	res = container_of(r, struct mpam_resctrl_res, resctrl_res);
-	num_mbwu_mon = res->class->props.num_mbwu_mon;
-	cfg.mon = resctrl_arch_rmid_idx_encode(closid, rmid) % num_mbwu_mon;
+	cfg.mon = resctrl_arch_rmid_idx_encode(closid, rmid);
 	cfg.match_pmg = true;
 	cfg.pmg = rmid;
 
