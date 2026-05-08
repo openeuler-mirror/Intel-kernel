@@ -1322,6 +1322,26 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_domain *d,
 	}
 }
 
+static bool mpam_cpbm_hisi_check_invalid(struct rdt_resource *r,
+					 unsigned long val)
+{
+	static const struct midr_range cpus[] = {
+		MIDR_ALL_VERSIONS(MIDR_HISI_HIP12),
+		{ /* sentinel */ }
+	};
+
+	if (!is_midr_in_range_list(cpus))
+		return false;
+
+	if (r->cache_level != 3)
+		return false;
+
+	if (val & ~(BIT(18) | BIT(17)))
+		return false;
+
+	return true;
+}
+
 int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_domain *d,
 			    u32 closid, enum resctrl_conf_type t, u32 cfg_val)
 {

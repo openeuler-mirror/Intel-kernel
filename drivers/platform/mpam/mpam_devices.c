@@ -91,11 +91,6 @@ static DECLARE_WORK(mpam_broken_work, &mpam_disable);
  */
 LIST_HEAD(mpam_classes);
 
-static const struct midr_range hip12_cpus[] = {
-	MIDR_ALL_VERSIONS(MIDR_HISI_HIP12),
-	{ /* sentinel */ }
-};
-
 static u32 __mpam_read_reg(struct mpam_msc *msc, u16 reg)
 {
 	WARN_ON_ONCE(reg + sizeof(u32) > msc->mapped_hwpage_sz);
@@ -581,10 +576,15 @@ static struct mpam_msc_ris *mpam_get_or_create_ris(struct mpam_msc *msc,
 u16 mpam_cpbm_wd_hisi_workaround(u16 cpbm_wd, enum mpam_device_features feat,
 				 u8 cache_level)
 {
+	static const struct midr_range cpus[] = {
+		MIDR_ALL_VERSIONS(MIDR_HISI_HIP12),
+		{ /* sentinel */ }
+	};
+
 	if (cache_level != 3)
 		return cpbm_wd;
 
-	if (is_midr_in_range_list(hip12_cpus)) {
+	if (is_midr_in_range_list(cpus)) {
 		if (feat == mpam_feat_cpor_part)
 			return 19;
 		else if (feat == mpam_feat_ccap_part ||
@@ -747,7 +747,12 @@ static void mpam_ris_hw_probe(struct mpam_msc_ris *ris)
 
 static int mpam_pmg_max_workaround(u64 idr)
 {
-	if (is_midr_in_range_list(hip12_cpus))
+	static const struct midr_range cpus[] = {
+		MIDR_ALL_VERSIONS(MIDR_HISI_HIP12),
+		{ /* sentinel */ }
+	};
+
+	if (is_midr_in_range_list(cpus))
 		return 0;
 
 	return FIELD_GET(MPAMF_IDR_PMG_MAX, idr);
@@ -920,11 +925,16 @@ static void read_msmon_ctl_flt_vals(struct mon_read *m, u32 *ctl_val,
 static bool mpam_csu_hisi_need_retrigger(struct mpam_msc_ris *ris,
 					 bool read_again)
 {
+	static const struct midr_range cpus[] = {
+		MIDR_ALL_VERSIONS(MIDR_HISI_HIP12),
+		{ /* sentinel */ }
+	};
+
 	if (ris->comp->class->type != MPAM_CLASS_CACHE ||
 	    ris->comp->class->level != 3)
 		return false;
 
-	if (!is_midr_in_range_list(hip12_cpus))
+	if (!is_midr_in_range_list(cpus))
 		return false;
 
 	if (read_again)
@@ -997,7 +1007,12 @@ static bool mpam_ris_has_nrdy_bit(struct mpam_msc_ris *ris)
 
 static u64 mpam_csu_hisi_need_halved(struct mpam_msc_ris *ris, u64 now)
 {
-	if (!is_midr_in_range_list(hip12_cpus))
+	static const struct midr_range cpus[] = {
+		MIDR_ALL_VERSIONS(MIDR_HISI_HIP12),
+		{ /* sentinel */ }
+	};
+
+	if (!is_midr_in_range_list(cpus))
 		return now;
 
 	if (ris->comp->class->type != MPAM_CLASS_CACHE ||
@@ -1294,7 +1309,13 @@ static void mpam_reset_msc_bitmap(struct mpam_msc *msc, u16 reg, u16 wd)
 
 static u32 mpam_cpbm_hisi_workaround(u32 cpbm, u8 cache_level)
 {
-	if (cache_level != 3 || !is_midr_in_range_list(hip12_cpus))
+	static const struct midr_range cpus[] = {
+		MIDR_ALL_VERSIONS(MIDR_HISI_HIP12),
+		{ /* sentinel */ }
+	};
+
+	if (cache_level != 3 ||
+	   !is_midr_in_range_list(cpus))
 		return cpbm;
 
 	if (cpbm & BIT(18))
@@ -1306,21 +1327,6 @@ static u32 mpam_cpbm_hisi_workaround(u32 cpbm, u8 cache_level)
 		cpbm &= ~BIT(18);
 
 	return cpbm;
-}
-
-bool mpam_cpbm_hisi_check_invalid(struct rdt_resource *r,
-				  unsigned long val)
-{
-	if (!is_midr_in_range_list(hip12_cpus))
-		return false;
-
-	if (r->cache_level != 3)
-		return false;
-
-	if (val & ~(BIT(18) | BIT(17)))
-		return false;
-
-	return true;
 }
 
 static u16 mpam_intpri_default_val(struct mpam_msc_ris *ris)
