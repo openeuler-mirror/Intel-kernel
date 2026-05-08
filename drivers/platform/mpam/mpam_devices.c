@@ -584,7 +584,7 @@ u16 mpam_cpbm_wd_hisi_workaround(u16 cpbm_wd, enum mpam_device_features feat,
 	if (cache_level != 3)
 		return cpbm_wd;
 
-	if (is_midr_in_range_list(cpus)) {
+	if (is_midr_in_range_list(read_cpuid_id(), cpus)) {
 		if (feat == mpam_feat_cpor_part)
 			return 19;
 		else if (feat == mpam_feat_ccap_part ||
@@ -978,7 +978,7 @@ static u64 mpam_csu_hisi_need_halved(struct mpam_msc_ris *ris, u64 now)
 		{ /* sentinel */ }
 	};
 
-	if (!is_midr_in_range_list(cpus))
+	if (!is_midr_in_range_list(read_cpuid_id(), cpus))
 		return now;
 
 	if (ris->comp->class->type != MPAM_CLASS_CACHE ||
@@ -1279,7 +1279,7 @@ static u32 mpam_cpbm_hisi_workaround(u32 cpbm, u8 cache_level)
 	};
 
 	if (cache_level != 3 ||
-	   !is_midr_in_range_list(cpus))
+	   !is_midr_in_range_list(read_cpuid_id(), cpus))
 		return cpbm;
 
 	if (cpbm & BIT(18))
