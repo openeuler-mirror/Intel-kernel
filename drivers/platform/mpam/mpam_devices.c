@@ -926,7 +926,6 @@ static u64 mpam_msmon_overflow_val(struct mpam_msc_ris *ris)
 static const struct midr_range mbwu_flowrate_list[] = {
 	MIDR_ALL_VERSIONS(MIDR_HISI_TSV110),
 	MIDR_ALL_VERSIONS(MIDR_HISI_LINXICORE9100),
-	MIDR_ALL_VERSIONS(MIDR_HISI_HIP12),
 	{ /* sentinel */ }
 };
 
