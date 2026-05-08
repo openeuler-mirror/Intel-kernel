@@ -741,7 +741,8 @@ static int rdtgroup_move_task(pid_t pid, struct rdtgroup *rdtgrp,
 	return ret;
 }
 
-static int rdtgroup_move_iommu(int iommu_group_id, struct rdtgroup *rdtgrp)
+static int rdtgroup_move_iommu(int iommu_group_id, struct rdtgroup *rdtgrp,
+			       struct kernfs_open_file *of)
 {
 	const struct cred *cred = current_cred();
 	struct iommu_group *iommu_group;
@@ -773,53 +774,6 @@ static int rdtgroup_move_iommu(int iommu_group_id, struct rdtgroup *rdtgrp)
 
 	iommu_group_put(iommu_group);
 
-	return err;
-}
-
-static bool iommu_matches_rdtgroup(struct iommu_group *group, struct rdtgroup *r)
-{
-	if (r->type == RDTCTRL_GROUP)
-		return resctrl_arch_match_iommu_closid(group, r->closid);
-
-	return resctrl_arch_match_iommu_closid_rmid(group, r->closid,
-						    r->mon.rmid);
-}
-
-static int rdt_move_group_iommus(struct rdtgroup *from, struct rdtgroup *to)
-{
-	int err, iommu_group_id;
-	struct kset *iommu_groups;
-	struct iommu_group *group;
-	struct kobject *group_kobj = NULL;
-
-	if (!IS_ENABLED(CONFIG_RESCTRL_IOMMU))
-		return 0;
-
-	if (from == to)
-		return 0;
-
-	iommu_groups = iommu_get_group_kset();
-
-	while ((group_kobj = kset_get_next_obj(iommu_groups, group_kobj))) {
-		/* iommu_group_get_from_kobj() wants to drop a reference */
-		kobject_get(group_kobj);
-
-		group = iommu_group_get_from_kobj(group_kobj);
-		if (!group)
-			continue;
-
-		if (!from || iommu_matches_rdtgroup(group, from)) {
-			err = kstrtoint(group_kobj->name, 0, &iommu_group_id);
-			if (err)
-				break;
-
-			err = rdtgroup_move_iommu(iommu_group_id, to);
-			if (err)
-				break;
-		}
-	}
-
-	kset_put(iommu_groups);
 	return err;
 }
 
@@ -868,7 +822,7 @@ static ssize_t rdtgroup_tasks_write(struct kernfs_open_file *of,
 
 		is_iommu = string_is_iommu_group(pid_str, &iommu_group_id);
 		if (is_iommu) {
-			ret = rdtgroup_move_iommu(iommu_group_id, rdtgrp);
+			ret = rdtgroup_move_iommu(iommu_group_id, rdtgrp, of);
 			if (ret)
 				break;
 
@@ -898,6 +852,15 @@ unlock:
 	rdtgroup_kn_unlock(of->kn);
 
 	return ret ?: nbytes;
+}
+
+static bool iommu_matches_rdtgroup(struct iommu_group *group, struct rdtgroup *r)
+{
+	if (r->type == RDTCTRL_GROUP)
+		return resctrl_arch_match_iommu_closid(group, r->closid);
+
+	return resctrl_arch_match_iommu_closid_rmid(group, r->closid,
+						    r->mon.rmid);
 }
 
 static void show_rdt_iommu(struct rdtgroup *r, struct seq_file *s)
@@ -2892,9 +2855,6 @@ static void rmdir_all_sub(void)
 	/* Move all tasks to the default resource group */
 	rdt_move_group_tasks(NULL, &rdtgroup_default, NULL);
 
-	/* Move all iommu_groups to the default resource group */
-	rdt_move_group_iommus(NULL, &rdtgroup_default);
-
 	list_for_each_entry_safe(rdtgrp, tmp, &rdt_all_groups, rdtgroup_list) {
 		/* Free any child rmids */
 		free_all_child_rdtgrp(rdtgrp);
@@ -3610,9 +3570,6 @@ static int rdtgroup_rmdir_mon(struct rdtgroup *rdtgrp, cpumask_var_t tmpmask)
 	/* Give any tasks back to the parent group */
 	rdt_move_group_tasks(rdtgrp, prdtgrp, tmpmask);
 
-	/* Give any iommu_groups back to the parent group */
-	rdt_move_group_iommus(rdtgrp, prdtgrp);
-
 	/* Update per cpu rmid of the moved CPUs first */
 	for_each_cpu(cpu, &rdtgrp->cpu_mask)
 		resctrl_arch_set_cpu_default_closid_rmid(cpu, rdtgrp->closid,
@@ -3655,9 +3612,6 @@ static int rdtgroup_rmdir_ctrl(struct rdtgroup *rdtgrp, cpumask_var_t tmpmask)
 
 	/* Give any tasks back to the default group */
 	rdt_move_group_tasks(rdtgrp, &rdtgroup_default, tmpmask);
-
-	/* Give any iommu_groups back to the default group */
-	rdt_move_group_iommus(rdtgrp, &rdtgroup_default);
 
 	/* Give any CPUs back to the default group */
 	cpumask_or(&rdtgroup_default.cpu_mask,
