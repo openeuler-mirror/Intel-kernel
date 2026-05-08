@@ -120,7 +120,7 @@ int resctrl_arch_set_cdp_enabled(enum resctrl_res_level ignored, bool enable)
 	return 0;
 }
 
-bool resctrl_arch_hide_cdp(enum resctrl_res_level rid)
+static bool mpam_resctrl_hide_cdp(enum resctrl_res_level rid)
 {
 	return cdp_enabled && !resctrl_arch_get_cdp_enabled(rid);
 }
@@ -957,16 +957,7 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_domain *d,
 	dom = container_of(d, struct mpam_resctrl_dom, resctrl_dom);
 	cprops = &res->class->props;
 
-	/*
-	 * When CDP is enabled, but the resource doesn't support it, we
-	 * need to get the configuration from the CDP_CODE resctrl_conf_type
-	 * which is same as the CDP_DATA one.
-	 */
-	if (resctrl_arch_hide_cdp(r->rid))
-		partid = resctrl_get_config_index(closid, CDP_CODE);
-	else
-		partid = resctrl_get_config_index(closid, type);
-
+	partid = resctrl_get_config_index(closid, type);
 	cfg = &dom->comp->cfg[partid];
 
 	switch (r->rid) {
@@ -1008,6 +999,7 @@ u32 resctrl_arch_get_config(struct rdt_resource *r, struct rdt_domain *d,
 int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_domain *d,
 			    u32 closid, enum resctrl_conf_type t, u32 cfg_val)
 {
+	int err;
 	u32 partid;
 	struct mpam_config cfg;
 	struct mpam_props *cprops;
@@ -1049,7 +1041,22 @@ int resctrl_arch_update_one(struct rdt_resource *r, struct rdt_domain *d,
 		return -EINVAL;
 	}
 
-	return mpam_apply_config(dom->comp, partid, &cfg);
+	/*
+	 * When CDP is enabled, but the resource doesn't support it, we need to
+	 * apply the same configuration to the other partid.
+	 */
+	if (mpam_resctrl_hide_cdp(r->rid)) {
+		partid = resctrl_get_config_index(closid, CDP_CODE);
+		err = mpam_apply_config(dom->comp, partid, &cfg);
+		if (err)
+			return err;
+
+		partid = resctrl_get_config_index(closid, CDP_DATA);
+		return mpam_apply_config(dom->comp, partid, &cfg);
+
+	} else {
+		return mpam_apply_config(dom->comp, partid, &cfg);
+	}
 }
 
 /* TODO: this is IPI heavy */
