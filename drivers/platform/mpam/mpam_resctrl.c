@@ -313,15 +313,34 @@ struct rdt_resource *resctrl_arch_get_resource(enum resctrl_res_level l)
 	return &mpam_resctrl_exports[l].resctrl_res;
 }
 
-void *resctrl_arch_mon_ctx_alloc(struct rdt_resource *r, int evtid)
+static void *resctrl_arch_mon_ctx_alloc_no_wait(struct rdt_resource *r,
+						int evtid)
 {
-	u32 *ret;
+	u32 *ret = kmalloc(sizeof(*ret), GFP_KERNEL);
 
-	ret = kmalloc(sizeof(*ret), GFP_KERNEL);
 	if (!ret)
 		return ERR_PTR(-ENOMEM);
 
 	*ret = __mon_is_rmid_idx;
+	return ret;
+}
+
+void *resctrl_arch_mon_ctx_alloc(struct rdt_resource *r, int evtid)
+{
+	DEFINE_WAIT(wait);
+	void *ret;
+
+	might_sleep();
+
+	do {
+		prepare_to_wait(&resctrl_mon_ctx_waiters, &wait,
+				TASK_INTERRUPTIBLE);
+		ret = resctrl_arch_mon_ctx_alloc_no_wait(r, evtid);
+		if (PTR_ERR(ret) == -ENOSPC)
+			schedule();
+	} while (PTR_ERR(ret) == -ENOSPC && !signal_pending(current));
+	finish_wait(&resctrl_mon_ctx_waiters, &wait);
+
 	return ret;
 }
 
