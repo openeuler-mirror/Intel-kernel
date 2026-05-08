@@ -120,11 +120,6 @@ static int acpi_mpam_parse_resource(struct acpi_mpam_msc_node *tbl_msc,
 	off_t offset;
 	int level;
 
-	if (mpam_only_enable_mb()) {
-		if (res->locator_type != ACPI_MPAM_LOCATION_TYPE_MEMORY)
-			return 0;
-	}
-
 	/*
 	 * Class IDs are somewhat arbitrary, but need to be co-ordinated.
 	 * 0-N are caches,
