@@ -439,8 +439,7 @@ void resctrl_arch_reset_rmid(struct rdt_resource *r, struct rdt_domain *d,
 	struct mpam_resctrl_dom *dom;
 	struct mpam_resctrl_res *res;
 
-	if (eventid == QOS_L3_OCCUP_EVENT_ID ||
-	    eventid == QOS_L2_OCCUP_EVENT_ID)
+	if (eventid != QOS_L3_MBM_LOCAL_EVENT_ID)
 		return;
 
 	res = container_of(r, struct mpam_resctrl_res, resctrl_res);
