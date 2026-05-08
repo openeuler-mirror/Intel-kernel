@@ -1413,12 +1413,6 @@ static u64 __kvm_read_sanitised_id_reg(const struct kvm_vcpu *vcpu,
 		val &= ~ARM64_FEATURE_MASK(ID_AA64PFR1_EL1_SME);
 		val &= ~ARM64_FEATURE_MASK(ID_AA64PFR1_EL1_NMI);
 		val |= FIELD_PREP(ARM64_FEATURE_MASK(ID_AA64PFR1_EL1_NMI), vcpu->kvm->arch.pfr1_nmi);
-		/*
-		 * MPAM is disabled by default as KVM also needs a set of PARTID to
-		 * program the MPAMVPMx_EL2 PARTID remapping registers with. Hide,
-		 * MPAM_frac as well from Guest to handle FEAT_MPAMv0p1.
-		 */
-		val &= ~ARM64_FEATURE_MASK(ID_AA64PFR1_EL1_MPAM_frac);
 		break;
 	case SYS_ID_AA64ISAR1_EL1:
 		if (!vcpu_has_ptrauth(vcpu))
@@ -1598,13 +1592,6 @@ static u64 read_sanitised_id_aa64pfr0_el1(struct kvm_vcpu *vcpu,
 
 	val &= ~ID_AA64PFR0_EL1_AMU_MASK;
 
-	/*
-	 * MPAM is disabled by default as KVM also needs a set of PARTID to
-	 * program the MPAMVPMx_EL2 PARTID remapping registers with. But some
-	 * older kernels let the guest see the ID bit.
-	 */
-	val &= ~ID_AA64PFR0_EL1_MPAM_MASK;
-
 	return val;
 }
 
@@ -1680,29 +1667,6 @@ static int set_id_aa64dfr0_el1(struct kvm_vcpu *vcpu,
 	return set_id_reg(vcpu, rd, val);
 }
 
-static int set_id_aa64pfr0_el1(struct kvm_vcpu *vcpu,
-			       const struct sys_reg_desc *rd, u64 user_val)
-{
-	u64 hw_val = read_sanitised_ftr_reg(SYS_ID_AA64PFR0_EL1);
-	u64 mpam_mask = ID_AA64PFR0_EL1_MPAM_MASK;
-
-	/*
-	 * Commit 011e5f5bf529f ("arm64/cpufeature: Add remaining feature bits
-	 * in ID_AA64PFR0 register") exposed the MPAM field of AA64PFR0_EL1 to
-	 * guests, but didn't add trap handling. KVM doesn't support MPAM and
-	 * always returns an UNDEF for these registers. The guest must see 0
-	 * for this field.
-	 *
-	 * But KVM must also accept values from user-space that were provided
-	 * by KVM. On CPUs that support MPAM, permit user-space to write
-	 * the santisied value to ID_AA64PFR0_EL1.MPAM, but ignore this field.
-	 */
-	if ((hw_val & mpam_mask) == (user_val & mpam_mask))
-		user_val &= ~ID_AA64PFR0_EL1_MPAM_MASK;
-
-	return set_id_reg(vcpu, rd, user_val);
-}
-
 static u64 read_sanitised_id_dfr0_el1(struct kvm_vcpu *vcpu,
 				      const struct sys_reg_desc *rd)
 {
@@ -1768,8 +1732,6 @@ static int set_id_aa64pfr1_el1(struct kvm_vcpu *vcpu,
 			       const struct sys_reg_desc *rd,
 			       u64 val)
 {
-	u64 hw_val = read_sanitised_ftr_reg(SYS_ID_AA64PFR1_EL1);
-	u64 mpamfrac_mask = ID_AA64PFR1_EL1_MPAM_frac_MASK;
 	u8 nmi;
 
 	nmi = cpuid_feature_extract_unsigned_field(val, ID_AA64PFR1_EL1_NMI_SHIFT);
@@ -1777,23 +1739,15 @@ static int set_id_aa64pfr1_el1(struct kvm_vcpu *vcpu,
 	    (nmi && (!cpus_have_const_cap(ARM64_HAS_NMI) || static_branch_unlikely(&vgic_v3_cpuif_trap))))
 		return -EINVAL;
 
+	/* We can only differ with NMI, and anything else is an error */
+	val ^= read_id_reg(vcpu, rd);
+	val &= ~ARM64_FEATURE_MASK(ID_AA64PFR1_EL1_NMI);
+	if (val)
+		return -EINVAL;
+
 	vcpu->kvm->arch.pfr1_nmi = nmi;
 
-	/*
-	 * KVM doesn't support MPAM but Commit 14e270fa5c4c ("arm64/cpufeature:
-	 * Add remaining feature bits in ID_AA64PFR1 register") exposed the
-	 * MPAM_frac field of AA64PFR1_EL1 to guests.Though we already hide
-	 * MPAM in ID_AA64PFR0_EL1, need to hide this MPAM_frac field as well
-	 * in order to take of systems with FEAT_MPAMv0p1 support.
-	 *
-	 * Similar to MPAM field in ID_AA64PFR0_EL1, on CPUs that support
-	 * FEAT_MPAMv0p1, permit user-space to write the santisied value to
-	 * ID_AA64PFR1_EL1.MPAM_frac, but ignore this field.
-	 */
-	if ((hw_val & mpamfrac_mask) == (val & mpamfrac_mask))
-		val &= ~ID_AA64PFR1_EL1_MPAM_frac_MASK;
-
-	return set_id_reg(vcpu, rd, val);
+	return 0;
 }
 
 /*
@@ -2448,7 +2402,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
 	{ SYS_DESC(SYS_ID_AA64PFR0_EL1),
 	  .access = access_id_reg,
 	  .get_user = get_id_reg,
-	  .set_user = set_id_aa64pfr0_el1,
+	  .set_user = set_id_reg,
 	  .reset = read_sanitised_id_aa64pfr0_el1,
 	  .val = ~(ID_AA64PFR0_EL1_AMU |
 		   ID_AA64PFR0_EL1_MPAM |
