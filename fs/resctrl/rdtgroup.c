@@ -2809,7 +2809,6 @@ static int rdt_parse_param(struct fs_context *fc, struct fs_parameter *param)
 {
 	struct rdt_fs_context *ctx = rdt_fc2context(fc);
 	struct fs_parse_result result;
-	struct rdt_resource *r;
 	int opt;
 
 	opt = fs_parse(fc, rdt_fs_parameters, param, &result);
@@ -2818,15 +2817,9 @@ static int rdt_parse_param(struct fs_context *fc, struct fs_parameter *param)
 
 	switch (opt) {
 	case Opt_cdp:
-		r = resctrl_arch_get_resource(RDT_RESOURCE_L3);
-		if (!r->alloc_capable)
-			return -EINVAL;
 		ctx->enable_cdpl3 = true;
 		return 0;
 	case Opt_cdpl2:
-		r = resctrl_arch_get_resource(RDT_RESOURCE_L2);
-		if (!r->alloc_capable)
-			return -EINVAL;
 		ctx->enable_cdpl2 = true;
 		return 0;
 	case Opt_mba_mbps:
@@ -2838,9 +2831,6 @@ static int rdt_parse_param(struct fs_context *fc, struct fs_parameter *param)
 		ctx->enable_debug = true;
 		return 0;
 	case Opt_l2:
-		r = resctrl_arch_get_resource(RDT_RESOURCE_L2);
-		if (!r->alloc_capable)
-			return -EINVAL;
 		ctx->enable_l2 = true;
 		return 0;
 	}
