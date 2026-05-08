@@ -100,15 +100,10 @@ void rdt_staged_configs_clear(void)
 {
 	struct rdt_resource *r;
 	struct rdt_domain *dom;
-	int i;
 
 	lockdep_assert_held(&rdtgroup_mutex);
 
-	for (i = 0; i < RDT_NUM_RESOURCES; i++) {
-		r = resctrl_arch_get_resource(i);
-		if (!r->alloc_capable)
-			continue;
-
+	for_each_alloc_capable_rdt_resource(r) {
 		list_for_each_entry(dom, &r->domains, list)
 			memset(dom->staged_config, 0, sizeof(dom->staged_config));
 	}
@@ -2190,7 +2185,6 @@ static int rdtgroup_mkdir_info_resdir(void *priv, char *name,
 
 static int rdtgroup_create_info_dir(struct kernfs_node *parent_kn)
 {
-	enum resctrl_res_level i;
 	struct resctrl_schema *s;
 	struct rdt_resource *r;
 	unsigned long fflags;
@@ -2215,12 +2209,8 @@ static int rdtgroup_create_info_dir(struct kernfs_node *parent_kn)
 			goto out_destroy;
 	}
 
-	for (i = 0; i < RDT_NUM_RESOURCES; i++) {
-		r = resctrl_arch_get_resource(i);
-		if (!r->mon_capable)
-			continue;
-
-		fflags =  r->fflags | RFTYPE_MON_INFO;
+	for_each_mon_capable_rdt_resource(r) {
+		fflags = r->fflags | RFTYPE_MON_INFO;
 		sprintf(name, "%s_MON", r->name);
 		ret = rdtgroup_mkdir_info_resdir(r, name, fflags);
 		if (ret)
@@ -2629,15 +2619,10 @@ static int schemata_list_add(struct rdt_resource *r, enum resctrl_conf_type type
 
 static int schemata_list_create(void)
 {
-	enum resctrl_res_level i;
 	struct rdt_resource *r;
 	int ret = 0;
 
-	for (i = 0; i < RDT_NUM_RESOURCES; i++) {
-		r = resctrl_arch_get_resource(i);
-		if (!r->alloc_capable)
-			continue;
-
+	for_each_alloc_capable_rdt_resource(r) {
 		if (resctrl_arch_get_cdp_enabled(r->rid)) {
 			ret = schemata_list_add(r, CDP_CODE);
 			if (ret)
@@ -3185,7 +3170,6 @@ static int mkdir_mondata_all(struct kernfs_node *parent_kn,
 			     struct rdtgroup *prgrp,
 			     struct kernfs_node **dest_kn)
 {
-	enum resctrl_res_level i;
 	struct rdt_resource *r;
 	struct kernfs_node *kn;
 	int ret;
@@ -3204,11 +3188,7 @@ static int mkdir_mondata_all(struct kernfs_node *parent_kn,
 	 * Create the subdirectories for each domain. Note that all events
 	 * in a domain like L3 are grouped into a resource whose domain is L3
 	 */
-	for (i = 0; i < RDT_NUM_RESOURCES; i++) {
-		r = resctrl_arch_get_resource(i);
-		if (!r->mon_capable)
-			continue;
-
+	for_each_mon_capable_rdt_resource(r) {
 		ret = mkdir_mondata_subdir_alldom(kn, r, prgrp);
 		if (ret)
 			goto out_destroy;
