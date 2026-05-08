@@ -119,7 +119,12 @@ struct mpam_props
 };
 
 #define mpam_has_feature(_feat, x)	((1<<_feat) & (x)->features)
-#define mpam_set_feature(_feat, x)	((x)->features |= (1<<_feat))
+
+static inline void mpam_set_feature(enum mpam_device_features feat,
+				    struct mpam_props *props)
+{
+	props->features |= (1<<feat);
+}
 
 static inline void mpam_clear_feature(enum mpam_device_features feat,
 				      mpam_features_t *supported)
