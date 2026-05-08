@@ -1057,7 +1057,7 @@ static void __ris_msmon_read(void *arg)
 
 static int _msmon_read(struct mpam_component *comp, struct mon_read *arg)
 {
-	int err = 0, idx;
+	int err, idx;
 	bool read_again;
 	u64 wait_jiffies;
 	struct mpam_msc *msc;
@@ -1606,8 +1606,7 @@ static int __setup_ppi(struct mpam_msc *msc)
 	for_each_cpu(cpu, &msc->accessibility) {
 		struct mpam_msc *empty = *per_cpu_ptr(msc->error_dev_id, cpu);
 		if (empty != NULL) {
-			pr_err_once("%s shares PPI with %s!\n",
-				    dev_name(&msc->pdev->dev),
+			pr_err_once("%s shares PPI with %s!\n", 				    dev_name(&msc->pdev->dev),
 				    dev_name(&empty->pdev->dev));
 			return -EBUSY;
 		}
@@ -1627,6 +1626,7 @@ static int mpam_msc_setup_error_irq(struct mpam_msc *msc)
 
 	/* Allocate and initialise the percpu device pointer for PPI */
 	if (irq_is_percpu(irq))
+
 		return __setup_ppi(msc);
 
 	/* sanity check: shared interrupts can be routed anywhere? */
@@ -1696,7 +1696,7 @@ static int mpam_dt_parse_resource(struct mpam_msc *msc, struct device_node *np,
 
 static int mpam_dt_parse_resources(struct mpam_msc *msc, void *ignored)
 {
-	int err = 0, num_ris = 0;
+	int err, num_ris = 0;
 	const u32 *ris_idx_p;
 	struct device_node *iter, *np;
 
