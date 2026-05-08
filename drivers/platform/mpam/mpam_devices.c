@@ -1529,11 +1529,8 @@ static int mpam_discovery_cpu_online(unsigned int cpu)
 
 	mutex_lock(&mpam_list_lock);
 	list_for_each_entry(msc, &mpam_all_msc, glbl_list) {
-		if (!cpumask_test_cpu(cpu, &msc->accessibility)) {
-			msc->probed = true;
-			msc->skipped = true;
+		if (!cpumask_test_cpu(cpu, &msc->accessibility))
 			continue;
-		}
 
 		mutex_lock(&msc->lock);
 		if (!msc->probed)
@@ -1949,14 +1946,14 @@ static void mpam_enable_init_class_features(struct mpam_class *class)
 	struct mpam_msc_ris *ris;
 	struct mpam_component *comp;
 
-	list_for_each_entry(comp, &class->components, class_list) {
-		list_for_each_entry(ris, &comp->ris, comp_list) {
-			if (!ris->msc->skipped)
-				break;
-		}
-	}
+	comp = list_first_entry_or_null(&class->components,
+					struct mpam_component, class_list);
+	if (WARN_ON(!comp))
+		return;
 
-	if (WARN_ON(!comp) || WARN_ON(!ris))
+	ris = list_first_entry_or_null(&comp->ris,
+				       struct mpam_msc_ris, comp_list);
+	if (WARN_ON(!ris))
 		return;
 
 	class->props = ris->props;
@@ -1976,9 +1973,6 @@ static void mpam_enable_merge_features(void)
 
 		list_for_each_entry(comp, &class->components, class_list) {
 			list_for_each_entry(ris, &comp->ris, comp_list) {
-				if (ris->msc->skipped)
-					continue;
-
 				__resource_props_mismatch(ris, class);
 
 				class->nrdy_usec = max(class->nrdy_usec,
