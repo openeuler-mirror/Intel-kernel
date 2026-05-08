@@ -391,9 +391,6 @@ void mpam_resctrl_exit(void);
 
 /* MPAMF_CCAP_IDR - MPAM features cache capacity partitioning ID register */
 #define MPAMF_CCAP_IDR_CMAX_WD                  GENMASK(5, 0)
-#define MPAMF_CCAP_IDR_HAS_CMIN                 BIT(29)
-#define MPAMF_CCAP_IDR_NO_CMAX                  BIT(30)
-#define MPAMF_CCAP_IDR_HAS_CMAX_SOFTLIM         BIT(31)
 
 /* MPAMF_MBW_IDR - MPAM features memory bandwidth partitioning ID register */
 #define MPAMF_MBW_IDR_BWA_WD            GENMASK(5, 0)
