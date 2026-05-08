@@ -15,6 +15,7 @@
 
 #define L2_QOS_CDP_ENABLE		0x01ULL
 
+#define MAX_MBA_BW_AMD			0x800
 #define MBM_CNTR_WIDTH_OFFSET_AMD	20
 
 #define RMID_VAL_ERROR			BIT_ULL(63)
