@@ -260,7 +260,6 @@ bool resctrl_arch_match_rmid(struct task_struct *tsk, u32 closid, u32 rmid)
 	return (tsk_closid == closid) && (tsk_rmid == rmid);
 }
 
-#ifdef CONFIG_RESCTRL_IOMMU
 int resctrl_arch_set_iommu_closid_rmid(struct iommu_group *group, u32 closid,
 				       u32 rmid)
 {
@@ -303,7 +302,6 @@ bool resctrl_arch_match_iommu_closid_rmid(struct iommu_group *group,
 
 	return (partid == closid) && (rmid == pmg);
 }
-#endif
 
 struct rdt_resource *resctrl_arch_get_resource(enum resctrl_res_level l)
 {
