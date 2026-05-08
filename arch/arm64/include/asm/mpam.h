@@ -161,9 +161,6 @@ static inline void mpam_thread_switch(struct task_struct *tsk)
 		return;
 
 	/* Synchronising this write is left until the ERET to EL0 */
-	write_sysreg_s(regval, SYS_MPAM1_EL1);
-	isb();
-
 	write_sysreg_s(regval, SYS_MPAM0_EL1);
 	WRITE_ONCE(per_cpu(arm64_mpam_current, cpu), regval);
 }

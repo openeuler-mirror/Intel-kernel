@@ -40,9 +40,7 @@ static int mpam_pm_notifier(struct notifier_block *self,
 		 * value has changed under our feet.
 		 */
 		regval = READ_ONCE(per_cpu(arm64_mpam_current, cpu));
-		write_sysreg_s(regval, SYS_MPAM1_EL1);
-		isb();
-
+		write_sysreg_s(0, SYS_MPAM1_EL1);
 		write_sysreg_s(regval, SYS_MPAM0_EL1);
 
 		return NOTIFY_OK;
