@@ -4102,7 +4102,6 @@ static int arm_smmu_group_set_mpam(struct iommu_group *group, u16 partid,
 	int i;
 	u32 sid;
 	unsigned long flags;
-	unsigned int alloc_type;
 	struct arm_smmu_ste *step;
 	struct iommu_domain *domain;
 	struct arm_smmu_device *smmu;
@@ -4118,12 +4117,6 @@ static int arm_smmu_group_set_mpam(struct iommu_group *group, u16 partid,
 	struct arm_smmu_master_domain *master_domain;
 
 	domain = iommu_get_domain_for_group(group);
-
-	alloc_type = domain->type & IOMMU_DOMAIN_ALLOC_FLAGS;
-	if (alloc_type == IOMMU_DOMAIN_IDENTITY ||
-	    alloc_type == IOMMU_DOMAIN_BLOCKED)
-		return -EINVAL;
-
 	smmu_domain = to_smmu_domain(domain);
 
 	if (!smmu_domain->smmu)
@@ -4167,19 +4160,12 @@ static int arm_smmu_group_get_mpam(struct iommu_group *group, u16 *partid,
 {
 	int err = -EINVAL;
 	unsigned long flags;
-	unsigned int alloc_type;
 	struct iommu_domain *domain;
 	struct arm_smmu_master *master;
 	struct arm_smmu_domain *smmu_domain;
 	struct arm_smmu_master_domain *master_domain;
 
 	domain = iommu_get_domain_for_group(group);
-
-	alloc_type = domain->type & IOMMU_DOMAIN_ALLOC_FLAGS;
-	if (alloc_type == IOMMU_DOMAIN_IDENTITY ||
-	    alloc_type == IOMMU_DOMAIN_BLOCKED)
-		return 0;
-
 	smmu_domain = to_smmu_domain(domain);
 
 	if (!smmu_domain->smmu)
